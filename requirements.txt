@@ -1,0 +1,9 @@
+pandas
+jupyter
+requests
+lxml
+twint
+aiohttp_socks # for twint
+# jupyter_contrib_nbextensions
+# pylint
+# autopep8
