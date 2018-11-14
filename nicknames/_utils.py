@@ -1,14 +1,16 @@
 #!/bin/python
 import os
 import shutil
-from collections import Counter
+from collections import Counter, defaultdict
+from itertools import chain
 from typing import Dict, Sequence, Set
 
+import numpy as np
 import pandas as pd
 import twint
 from tqdm import tqdm
 
-from itertools import chain
+from langdetect import detect_langs
 
 __all__ = ['download_hashtags',
            'download_followers',
@@ -123,3 +125,37 @@ def create_group_dict(categories: Sequence[str]):
             users = set(map(lambda elem: elem.strip(), f.readlines()))
         groups[category] = users
     return groups
+
+
+def tweeter_user_lang_detect(user,limit=1,csv_path="C:\\Users\\Krzysiek\\PycharmProjects\\twitter-patterns\\dataset\\tweets.csv",header=0,delete_csv=True):
+    scrap_twits(user=user,limit=limit)
+    tweets=pd.read_csv(csv_path, header=header)
+    langsDetected=[detect_langs(i) for i in tweets["tweet"]]
+    langProbDic=defaultdict(list)
+    for tweetLangsProb in langsDetected:
+        for tweetLang in tweetLangsProb:
+            if(langProbDic[tweetLang.lang]!=None):
+                langProbDic[tweetLang.lang].append(tweetLang.prob)
+            else:
+                langProbDic[tweetLang.lang].append(tweetLang.lang)
+
+    maxMeanProbLang=(0,None)
+    for k in langProbDic:
+        mean=sum(langProbDic[k]) / float(len(langProbDic[k]))
+        if(mean>maxMeanProbLang[0]):
+            maxMeanProbLang=(mean,k)
+
+    if(delete_csv):
+        os.remove(csv_path)
+        os.remove(csv_path.replace("tweets","users"))
+    return maxMeanProbLang
+
+def only_lang_users(nicks_csv_path,output_path,lang='en',header=0):
+    nicks=pd.read_csv(nicks_csv_path, header=header)
+    langUsers=[]
+    for head in nicks:
+        for nick in nicks[head]:
+            probLang=tweeter_user_lang_detect(nick)
+            if probLang[1]==lang:
+                langUsers.append(nick)
+    np.savetxt(output_path, langUsers, delimiter=",", fmt='%s')
