@@ -13,7 +13,7 @@ considered_groups = ['politicians',
                      'musicians',
                      'celebrities']
 
-# # Downloading twitter nicks from the page with nicks
+# Downloading twitter nicks from the page with nicks
 # groups = download_category(*considered_groups)
 # # Filtering (removing duplicates etc) and exporting to files
 # filter_and_export(considered_groups, groups)
@@ -36,18 +36,15 @@ considered_groups = ['politicians',
 
 groups = create_group_dict(considered_groups)
 summary_dict(groups, 'Final')
+
 #######################
 # SCRAPING!!!! :3
 # TODO CHECK OPTIONS
 
 
 def scrap_group(group_name, groups=groups):
-
-    # for idx, user in enumerate(groups[group_name], start=1):
-    #     print(f'{group_name} {idx}/{len(groups[group_name])}: {user}')
-    with mp.Pool(5) as p:
-        p.map(partial(scrap_twits, limit=100000), groups[group_name])
-    # scrap_twits(user, limit=100000)
+    with mp.Pool(1) as p:
+        p.map(partial(scrap_twits, group=group_name, limit=100000), groups[group_name])
 
 processes = [mp.Process(target=scrap_group, args=(group_name,)) for group_name in considered_groups]
 for process in processes:

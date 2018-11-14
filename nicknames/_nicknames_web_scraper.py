@@ -10,7 +10,7 @@ import twint
 from lxml import html
 from tqdm import tqdm
 
-from _utils import summary_dict, summary_html
+from _utils import summary_dict, summary_html, find_duplicates
 
 __all__ = ['download_category', 'filter_and_export']
 
@@ -81,10 +81,12 @@ def filter_and_export(categories, groups):
     except FileNotFoundError as e:
         print(e)
 
+    duplicated = find_duplicates(groups)
+
     filtered_group = {}
     for group, users in tqdm(groups.items(), 'Filtering and exporting', leave=False):
         with open(f'{group}.txt', mode='w') as f:
-            filtered_group[group] = set(users) - set(chain(*[v for k, v in groups.items() if k is not group]))
+            filtered_group[group] = set(users) - duplicated
             f.write('\n'.join(filtered_group[group]))
 
     summary_dict(filtered_group, 'Summary')

@@ -1,11 +1,14 @@
 #!/bin/python
 import os
 import shutil
-from typing import Dict, Sequence
+from collections import Counter
+from typing import Dict, Sequence, Set
 
 import pandas as pd
 import twint
 from tqdm import tqdm
+
+from itertools import chain
 
 __all__ = ['download_hashtags',
            'download_followers',
@@ -14,7 +17,7 @@ __all__ = ['download_hashtags',
            'scrap_twits',
            'merge_with_scraped',
            'summary_html',
-           'add_to_groups',
+           'find_duplicates',
            'summary_dict',
            'create_group_dict']
 
@@ -22,11 +25,8 @@ __all__ = ['download_hashtags',
 def summary_html(summary: Dict[str, str], title: str) -> str:
     print(title)
     html = f'<table><tr><th>Category</th><th>Count</th></tr>'
-
     for k, v in summary.items():
-        if len(v):
-            html += f'<tr><td>{k}</td><td>{len(v)}</td></tr>'
-
+        html += f'<tr><td>{k}</td><td>{len(v)}</td></tr>' if v else ''
     html += '</table>'
     return html
 
@@ -48,7 +48,7 @@ def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
     if os.path.isdir('hashtags'):
         shutil.rmtree('hashtags')
     config = twint.Config()
-    config.Search = ' '.join(hashtags)
+    config.Search = ' '.join('#' + hashtag for hashtag in hashtags)
     config.Lang = 'en'
     config.Store_csv = True
     config.Output = 'hashtags'
@@ -60,24 +60,19 @@ def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
     twint.run.Search(config)
 
 
-def scrap_twits(user: str, limit: int = 100000):
+def scrap_twits(user: str, group: str, limit: int = 100000):
     if user is None:
         return
     print(f'Scraping {user}...')
     config = twint.Config()
     config.Username = user
     config.Limit = limit
-    config.User_full = True
-    config.User_info = True
-    config.Followers = True
-    config.Following = True
-    config.Lowercase = True
-    config.Profile = True
-    config.Output = 'dataset'
+    config.Output = f'dataset/{group}'
     config.Store_csv = True
     config.Lang = 'en'
-    # config.Hide_output = True
-    config.Format = 'Username: {username} | Tweet: {tweet}'
+    config.Custom['group'] = group
+    config.Hide_output = True
+    # config.Format = '{id}'
     twint.run.Search(config)
 
 
@@ -117,8 +112,8 @@ def merge_with_scraped(group_name: str, other_users: Sequence['str']):
         print('OK')
 
 
-def add_to_groups(group: str, users: Sequence[str], groups: Dict[str, Sequence[str]]):
-    groups[group].update(users)
+def find_duplicates(groups):
+    return set(k for k, v in Counter(chain(*groups.values())).items() if v > 1)
 
 
 def create_group_dict(categories: Sequence[str]):
