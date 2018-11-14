@@ -127,27 +127,34 @@ def create_group_dict(categories: Sequence[str]):
     return groups
 
 
-def tweeter_user_lang_detect(user,limit=1,csv_path="C:\\Users\\Krzysiek\\PycharmProjects\\twitter-patterns\\dataset\\tweets.csv",header=0,delete_csv=True):
-    scrap_twits(user=user,limit=limit)
-    tweets=pd.read_csv(csv_path, header=header)
-    langsDetected=[detect_langs(i) for i in tweets["tweet"]]
-    langProbDic=defaultdict(list)
+def tweeter_user_lang_detect(user,limit=1,csv_path="dataset/politicians/tweets.csv",header=0,group="politicians",delete_csv=True):
+    try:
+        scrap_twits(user=user, limit=limit,group=group)
+        tweets = pd.read_csv(csv_path, header=header)
+    except :
+        with open("failed.txt", "a") as myfile:
+            print("failed")
+            myfile.write(user + "\n")
+        return (0, "bug")
+
+    langsDetected = [detect_langs(i) for i in tweets["tweet"]]
+    langProbDic = defaultdict(list)
     for tweetLangsProb in langsDetected:
         for tweetLang in tweetLangsProb:
-            if(langProbDic[tweetLang.lang]!=None):
+            if (langProbDic[tweetLang.lang] != None):
                 langProbDic[tweetLang.lang].append(tweetLang.prob)
             else:
                 langProbDic[tweetLang.lang].append(tweetLang.lang)
 
-    maxMeanProbLang=(0,None)
+    maxMeanProbLang = (0, None)
     for k in langProbDic:
-        mean=sum(langProbDic[k]) / float(len(langProbDic[k]))
-        if(mean>maxMeanProbLang[0]):
-            maxMeanProbLang=(mean,k)
+        mean = sum(langProbDic[k]) / float(len(langProbDic[k]))
+        if (mean > maxMeanProbLang[0]):
+            maxMeanProbLang = (mean, k)
 
-    if(delete_csv):
+    if (delete_csv):
         os.remove(csv_path)
-        os.remove(csv_path.replace("tweets","users"))
+        os.remove(csv_path.replace("tweets", "users"))
     return maxMeanProbLang
 
 def only_lang_users(nicks_csv_path,output_path,lang='en',header=0):
@@ -159,3 +166,4 @@ def only_lang_users(nicks_csv_path,output_path,lang='en',header=0):
             if probLang[1]==lang:
                 langUsers.append(nick)
     np.savetxt(output_path, langUsers, delimiter=",", fmt='%s')
+#only_lang_users("adds/politicians.csv","out.csv")
