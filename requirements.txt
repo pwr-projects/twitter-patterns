@@ -6,3 +6,4 @@ lxml
 twint
 aiohttp-socks
 langdetect
+nltk

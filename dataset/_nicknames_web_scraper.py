@@ -76,7 +76,7 @@ def find_categories_on_main_page(url: str) -> List[str]:
 
 def filter_and_export(categories, groups):
     try:
-        groups['politicians'].extend(map(lambda elem: elem.lower(), list(pd.read_csv('./adds/politicians.csv', header=0).screen_name)))
+        groups['politicians'].extend(map(lambda elem: elem.lower(), list(pd.read_csv('./adds/politicians.csv'))))
         groups['musicians'].extend(list(map(lambda elem: str(elem[1:]).lower(), filter(lambda elem: elem != 'nan', pd.read_csv('./adds/most_popular_musicians.csv', header=0)['Twitter handle'].astype(str)))))
     except FileNotFoundError as e:
         print(e)
