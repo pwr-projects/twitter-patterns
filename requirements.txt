@@ -1,9 +1,7 @@
+numpy
 pandas
-jupyter
+tqdm
 requests
 lxml
 twint
-aiohttp_socks # for twint
-# jupyter_contrib_nbextensions
-# pylint
-# autopep8
+aiohttp-socks
