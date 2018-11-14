@@ -1,9 +1,11 @@
 #!/bin/python
-from typing import Sequence, Dict
-import twint
 import os
-import pandas as pd
 import shutil
+from typing import Dict, Sequence
+
+import pandas as pd
+import twint
+from tqdm import tqdm
 
 __all__ = ['download_hashtags',
            'download_followers',
@@ -12,7 +14,10 @@ __all__ = ['download_hashtags',
            'scrap_twits',
            'merge_with_scraped',
            'summary_html',
-           'summary_dict']
+           'add_to_groups',
+           'summary_dict',
+           'create_group_dict']
+
 
 def summary_html(summary: Dict[str, str], title: str) -> str:
     print(title)
@@ -21,12 +26,12 @@ def summary_html(summary: Dict[str, str], title: str) -> str:
     for k, v in summary.items():
         if len(v):
             html += f'<tr><td>{k}</td><td>{len(v)}</td></tr>'
-            
+
     html += '</table>'
     return html
 
 
-def summary_dict(summary: Dict[str, str], title: str):
+def summary_dict(summary: Dict[str, Sequence[str]], title: str):
     print(title)
     format = '{:15s}\t{:5d}'
     print('{:15s}\t{:5s}'.format('Category', 'Count'))
@@ -55,7 +60,10 @@ def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
     twint.run.Search(config)
 
 
-def scrap_twits(user: str, limit: int=100000):
+def scrap_twits(user: str, limit: int = 100000):
+    if user is None:
+        return
+    print(f'Scraping {user}...')
     config = twint.Config()
     config.Username = user
     config.Limit = limit
@@ -68,6 +76,8 @@ def scrap_twits(user: str, limit: int=100000):
     config.Output = 'dataset'
     config.Store_csv = True
     config.Lang = 'en'
+    # config.Hide_output = True
+    config.Format = 'Username: {username} | Tweet: {tweet}'
     twint.run.Search(config)
 
 
@@ -93,14 +103,28 @@ def get_users_with_lower_bound(min_followers: int = 10000) -> Sequence[str]:
     content = pd.read_csv('followers/users.csv', header=0)[['username', 'followers']].drop_duplicates('username')
     return to_lower(content[content.followers > min_followers].username)
 
+
 def merge_with_scraped(group_name: str, other_users: Sequence['str']):
     with open(f'{group_name}.txt', mode='r') as f:
         print(f'Merging nicks from group: {group_name}', end='...')
         new_users = set(map(lambda elem: elem.strip(), f.readlines()))
-        new_users.update(set(other_users)) 
+        new_users.update(set(other_users))
         print('OK')
 
     with open(f'{group_name}.txt', mode='w') as f:
         print(f'Saving to {group_name}.txt', end='...')
         f.write('\n'.join(new_users))
         print('OK')
+
+
+def add_to_groups(group: str, users: Sequence[str], groups: Dict[str, Sequence[str]]):
+    groups[group].update(users)
+
+
+def create_group_dict(categories: Sequence[str]):
+    groups = {}
+    for category in tqdm(categories, 'Reading group file'):
+        with open(f'{category}.txt', mode='r') as f:
+            users = set(map(lambda elem: elem.strip(), f.readlines()))
+        groups[category] = users
+    return groups

@@ -10,7 +10,7 @@ import twint
 from lxml import html
 from tqdm import tqdm
 
-from _download_celebrities import summary_dict, summary_html
+from _utils import summary_dict, summary_html
 
 __all__ = ['download_category', 'filter_and_export']
 
