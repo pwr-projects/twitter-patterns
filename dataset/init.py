@@ -1,11 +1,13 @@
 #!/bin/python
 import multiprocessing as mp
+import sys
 from functools import partial
 
+import twint
 from tqdm import tqdm
 
-from _utils import *
 from _nicknames_web_scraper import download_category, filter_and_export
+from _utils import *
 
 considered_groups = ['politicians',
                      'athletes',
@@ -13,7 +15,7 @@ considered_groups = ['politicians',
                      'musicians',
                      'celebrities']
 
-## Downloading twitter nicks from the page with nicks
+# Downloading twitter nicks from the page with nicks
 # groups = download_category(*considered_groups)
 # # Filtering (removing duplicates etc) and exporting to files
 # filter_and_export(considered_groups, groups)
@@ -37,19 +39,34 @@ considered_groups = ['politicians',
 # ## politicians stuff
 # merge_with_scraped('politicians', only_lang_users('adds/politicians.csv', 'adds/filtered_politicians.csv'))
 
-summary_dict(create_group_dict(*considered_groups), 'Final')
+# summary_dict(groups, 'Final')
 # #######################
 # # SCRAPING!!!! :3
 # # TODO CHECK OPTIONS
 
+# groups = create_group_dict(*considered_groups)
 
-def scrap_group(group_name, groups=create_group_dict(*considered_groups)):
-    with mp.Pool(3) as p:
-        p.map(partial(scrap_twits, group=group_name, limit=1000000), groups[group_name])
 
-processes = [mp.Process(target=scrap_group, args=(group_name,)) for group_name in ['musicians']]
-for process in processes:
-    process.start()
-for process in processes:
-    process.join()
+# żeby się scrapowali tylko ci, których tweety mamy, upewnij się, że masz pliki dataset/tweets/{nazwa grupy}/tweets.csv
+groups = create_group_dict_from_tweets(sys.argv[1]) 
 
+def get_batch(group_name, batch_size: int, batch_idx: int):
+    data = list(groups[group_name])
+    first = batch_size * batch_idx
+    last = batch_size * (batch_idx + 1)
+    last = last if last < len(data) else len(data)
+    return data[first:last]
+
+
+processes = [mp.Process(target=download_followers, args=(username, sys.argv[1], twint.run.Followers))
+             for username in get_batch(sys.argv[1], 5, int(sys.argv[2]))]
+
+[p.start() for p in processes]
+[p.join() for p in processes]
+
+# !!!!!!!!!!!!!!!!!!!
+# skrypt uruchamia się przez ./init.py {nazwa grupy} {batch id}
+# zrobiłem tak, bo nie chciało mi się synchronizować wątków, a uruchomionych 5 jest max dla twinta, żeby nie wywalił
+# nie jest to efektywne, bo za kazdym uruchomieniem skryptu tworzy się `groups` na podstawie tweetów podanej grupy, więc dość długo :c
+# jakbym mógł przetestować, to bym zmienił
+# jak komuś się chce to można przepisać

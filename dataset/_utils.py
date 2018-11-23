@@ -14,9 +14,6 @@ import twint
 from langdetect import detect_langs
 from tqdm import tqdm
 
-nltk.download('wordnet', '../.nltk_data')
-nltk.download('punkt', '../.nltk_data')
-
 
 def summary_html(summary: Dict[str, str], title: str) -> str:
     print(title)
@@ -56,10 +53,9 @@ def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
     twint.run.Search(config)
 
 
-def scrap_twits(user: str, group: str, limit: int = 100000):
+def scrap_tweets(user: str, group: str, limit: int = 100000):
     if user is None:
         return
-    print(f'Scraping {user}...')
     config = twint.Config()
     config.Username = user
     config.Limit = limit
@@ -68,20 +64,20 @@ def scrap_twits(user: str, group: str, limit: int = 100000):
     config.Lang = 'en'
     config.Custom['group'] = group
     config.Hide_output = False
-    # config.Format = '{id}'
+    config.Format = '{id}'
     twint.run.Search(config)
 
 
-def download_followers(username: str):
+def download_followers(username: str, usergroup:str, function=twint.run.Followers):
     config = twint.Config()
     config.Username = username
     config.Lang = 'en'
     config.Store_csv = True
-    config.Output = 'temp/followers'
-    config.Limit = 1
+    config.Output = f'followers/{usergroup}/{username}.csv'
+    # config.Limit = limit
     config.Lowercase = True
-    config.Hide_output = True
-    twint.run.Followers(config)
+    # config.Hide_output = True
+    function(config)
 
 
 def extract_tweet_authors() -> Sequence[str]:
@@ -114,6 +110,13 @@ def create_group_dict(*categories: Sequence[str]) -> Dict[str, Set[str]]:
     return groups
 
 
+def create_group_dict_from_tweets(*categories: Sequence[str]) -> Dict[str, Set[str]]:
+    groups = {}
+    for category in tqdm(categories, 'Reading tweet file'):
+        groups[category] = pd.read_csv(f'tweets/{category}/tweets.csv').username.unique().tolist()
+    return groups
+
+
 def export_dict_to_files(groups: Dict[str, Set[str]]):
     for group_name, users in groups.items():
         outpath = f'{group_name}.txt'
@@ -132,7 +135,7 @@ def merge_with_scraped(group_name: str, other_users: Sequence['str']):
 def tweeter_user_lang_detect(user: str, limit: int=10, csv_path: str='tweets/tweets.csv', delete_csv: bool=True, scrap: bool=True) -> str:
     try:
         if scrap:
-             scrap_twits(user=user, limit=limit,group='')
+             scrap_tweets(user=user, limit=limit,group='')
         tweets = pd.read_csv(csv_path, header=0)
     except :
         with open('failed.txt', 'a') as myfile:
@@ -165,6 +168,9 @@ def only_lang_users(nicks_csv_path: str, output_path: str=None, lang: str ='en')
 
 
 def preprocess_tweets(tweets: Sequence[str], lemma:bool=True, remove_url:bool=True) -> Sequence[str]:
+
+    nltk.download('wordnet', '../.nltk_data')
+    nltk.download('punkt', '../.nltk_data')
     lemmatizer = nltk.stem.WordNetLemmatizer()
     preprocessed_tweets = []
     for tweet in tqdm(tweets, desc='preprocessing tweets'):
