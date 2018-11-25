@@ -182,10 +182,7 @@ def only_lang_users(nicks_csv_path: str, output_path: str = None, lang: str = 'e
     return lang_users
 
 
-def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: bool = True) -> Sequence[str]:
-
-    nltk.download('wordnet', '../.nltk_data')
-    nltk.download('punkt', '../.nltk_data')
+def preprocess_tweets(tweets: Sequence[str], lemma:bool=True, remove_url:bool=True, remove_mentions:bool=True) -> Sequence[str]:
     lemmatizer = nltk.stem.WordNetLemmatizer()
     preprocessed_tweets = []
     for tweet in tqdm(tweets, desc='preprocessing tweets'):
@@ -194,9 +191,10 @@ def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: boo
         tweet = str(tweet).translate(str.maketrans({key: None for key in string.punctuation}))
         tweet = nltk.word_tokenize(tweet)
         tweet = map(lambda word: word.lower(), tweet)
-        tweet = filter(lambda word: not word.startswith('@'), tweet)
+        tweet = filter(lambda word: not word.startswith('@'), tweet) if remove_mentions else tweet
         tweet = map(lemmatizer.lemmatize, tqdm(tweet, 'Lemmatizing')) if lemma else tweet
         tweet = ' '.join(tweet)
         if tweet:
             preprocessed_tweets.append(tweet)
     return preprocessed_tweets
+
