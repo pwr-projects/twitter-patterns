@@ -1,7 +1,7 @@
 #!/bin/bash
 clear
 sep=15
-arrayFormat="%${sep}s | %${sep}s | %${sep}s | %${sep}s | %${sep}s |"
+arrayFormat="%${sep}s | %${sep}s | %${sep}s | %${sep}s | %${sep}s |  %${sep}s"
 sizeregex="s/^([[:alnum:].,]+).*/\\1/"
 
 function users_cmd() {
@@ -9,7 +9,7 @@ function users_cmd() {
 	if [[ ! -f ${path} ]]; then
 		echo "- / -"
 	else
-		echo "$(cat ${path} | wc -l) / $(cat ${1}.txt | wc -l)"
+		echo "$(($(cat ${path} | wc -l) - 1)) / $(cat ${1}.txt | wc -l)"
 	fi
 }
 function tweets_cmd() {
@@ -17,7 +17,7 @@ function tweets_cmd() {
 	if [[ ! -f ${path} ]]; then
 		echo "-"
 	else
-		echo $(cat ${path} | wc -l)
+		echo $(($(cat ${path} | wc -l) - 1))
 	fi
 }
 
@@ -45,7 +45,7 @@ function print_info() {
 
 function print_array_begin() {
 	printf "${arrayFormat}\n" "Category" "Users" "Tweets" "Users filesize" "Tweets filesize"
-	for i in {1..86}; do
+	for i in {1..89}; do
 		printf '%c' '_'
 	done
 	printf '\n'
@@ -73,4 +73,5 @@ done
 print_array_begin 15
 while true; do
 	print_info $groupname '\r'
+	sleep 0.5
 done

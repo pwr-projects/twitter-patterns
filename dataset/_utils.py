@@ -4,7 +4,7 @@ import re
 import shutil
 import string
 from collections import Counter, defaultdict
-from itertools import chain, product, chain
+from itertools import chain, product
 from typing import Dict, Sequence, Set
 
 import nltk
@@ -13,6 +13,20 @@ import pandas as pd
 import twint
 from langdetect import detect_langs
 from tqdm import tqdm
+
+GROUPS = ['musicians',
+          'actors', 
+          'celebrities',
+          'athletes',
+          'politicians']
+
+
+def get_batch(groups, group_name, batch_size: int, batch_idx: int):
+    data = list(groups[group_name])
+    first = batch_size * batch_idx
+    last = batch_size * (batch_idx + 1)
+    last = last if last < len(data) else len(data)
+    return data[first:last]
 
 
 def summary_html(summary: Dict[str, str], title: str) -> str:
@@ -68,7 +82,7 @@ def scrap_tweets(user: str, group: str, limit: int = 100000):
     twint.run.Search(config)
 
 
-def download_followers(username: str, usergroup:str, function=twint.run.Followers):
+def download_followers(username: str, usergroup: str, function=twint.run.Followers):
     config = twint.Config()
     config.Username = username
     config.Lang = 'en'
@@ -91,11 +105,11 @@ def get_users_with_lower_bound(min_followers: int = 10000) -> Sequence[str]:
     return to_lower(content[content.followers > min_followers].username)
 
 
-def find_duplicates(groups:Dict[str, Sequence[str]], other_users:Sequence[str]=list()) -> Set[str]:
+def find_duplicates(groups: Dict[str, Sequence[str]], other_users: Sequence[str] = list()) -> Set[str]:
     return set(k for k, v in Counter(chain(*groups.values(), other_users)).items() if v > 1)
 
 
-def add_not_duplicates(groups: Dict[str, Set[str]], category:str, users: Sequence[str]):
+def add_not_duplicates(groups: Dict[str, Set[str]], category: str, users: Sequence[str]):
     to_add = set(users) - find_duplicates(groups, users)
     groups[category].update(to_add)
     return groups
@@ -132,12 +146,13 @@ def merge_with_scraped(group_name: str, other_users: Sequence['str']):
     return groups
 
 
-def tweeter_user_lang_detect(user: str, limit: int=10, csv_path: str='tweets/tweets.csv', delete_csv: bool=True, scrap: bool=True) -> str:
+def tweeter_user_lang_detect(
+        user: str, limit: int = 10, csv_path: str = 'tweets/tweets.csv', delete_csv: bool = True, scrap: bool = True) ->str:
     try:
         if scrap:
-             scrap_tweets(user=user, limit=limit,group='')
+            scrap_tweets(user=user, limit=limit, group='')
         tweets = pd.read_csv(csv_path, header=0)
-    except :
+    except:
         with open('failed.txt', 'a') as myfile:
             print('failed')
             myfile.write(user + '\n')
@@ -155,7 +170,7 @@ def tweeter_user_lang_detect(user: str, limit: int=10, csv_path: str='tweets/twe
     return max((np.mean(v), k) for k, v in lang_probs.items())[1]
 
 
-def only_lang_users(nicks_csv_path: str, output_path: str=None, lang: str ='en') -> Sequence[str]:
+def only_lang_users(nicks_csv_path: str, output_path: str = None, lang: str = 'en') -> Sequence[str]:
     with open(nicks_csv_path, mode='r') as f:
         nicks = [nick.strip() for nick in f.readlines()]
 
@@ -167,7 +182,7 @@ def only_lang_users(nicks_csv_path: str, output_path: str=None, lang: str ='en')
     return lang_users
 
 
-def preprocess_tweets(tweets: Sequence[str], lemma:bool=True, remove_url:bool=True) -> Sequence[str]:
+def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: bool = True) -> Sequence[str]:
 
     nltk.download('wordnet', '../.nltk_data')
     nltk.download('punkt', '../.nltk_data')
