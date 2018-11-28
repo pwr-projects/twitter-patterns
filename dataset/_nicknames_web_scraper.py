@@ -1,3 +1,4 @@
+import os
 import re
 from collections import Counter
 from itertools import chain
@@ -10,9 +11,10 @@ import twint
 from lxml import html
 from tqdm import tqdm
 
-from _utils import summary_dict, summary_html, find_duplicates
+from _utils import *
 
 __all__ = ['download_category', 'filter_and_export']
+
 
 
 def get_twitter_urls(category: str, min_no_of_users: int) -> List[str]:
@@ -85,7 +87,7 @@ def filter_and_export(categories, groups):
 
     filtered_group = {}
     for group, users in tqdm(groups.items(), 'Filtering and exporting', leave=False):
-        with open(f'{group}.txt', mode='w') as f:
+        with open(os.path.join(USERS_LIST_DIR, f'{group}.txt'), mode='w') as f:
             filtered_group[group] = set(users) - duplicated
             f.write('\n'.join(filtered_group[group]))
 

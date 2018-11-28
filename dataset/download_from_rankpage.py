@@ -1,6 +1,9 @@
 #!/bin/python
+import os
+
 from _nicknames_web_scraper import *
-from _utils import GROUPS
+from _utils import *
+
 # Downloading twitter nicks from the page with nicks
 groups = download_category(*GROUPS)
 # Filtering (removing duplicates etc) and exporting to files
@@ -22,7 +25,8 @@ for user in tqdm(extract_tweet_authors(), 'Downloading users followers'):
 merge_with_scraped('celebrities', get_users_with_lower_bound(min_followers=5000))
 
 
-## politicians stuff
-merge_with_scraped('politicians', only_lang_users('adds/politicians.csv', 'adds/filtered_politicians.csv'))
+# politicians stuff
+merge_with_scraped('politicians', only_lang_users(os.path.join(USERS_LIST_DIR, 'politicians.csv'),
+                                                  os.path.join(USERS_LIST_DIR, 'politicians.csv')))
 
 summary_dict(groups, 'Final')

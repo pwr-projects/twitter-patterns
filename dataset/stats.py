@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from _utils import GROUPS
+from _utils import *
+
 tqdm.pandas()
 
 __all__ = ['get_top_followers',
@@ -19,10 +20,7 @@ __all__ = ['get_top_followers',
 
 
 # %%
-TWEETS_DIR = 'tweets'
-TWEETS_FILENAME = 'tweets.csv'
-USERS_FILENAME = 'users.csv'
-TEMP_DIR = '.tmp'
+
 
 if not os.path.isdir(TEMP_DIR):
     os.mkdir(TEMP_DIR)
@@ -98,7 +96,7 @@ def doTheThing(*groups, only_inside_group=False, verbose=True):
         mentions = mentions[mentions.username != mentions.mentioned]
         if only_inside_group:
             mentions = mentions[mentions.apply(lambda x: x.mentioned in x.username,
-                                                        axis='columns')]
+                                               axis='columns')]
         all_mentions.append(mentions)
 
     mentions = pd.concat(all_mentions, ignore_index=True)
@@ -108,6 +106,7 @@ def doTheThing(*groups, only_inside_group=False, verbose=True):
         pkl.dump(mentions, f)
     return mentions
 
+
 groups = GROUPS
 
 inside = doTheThing(*groups, only_inside_group=True, verbose=False)
@@ -115,9 +114,11 @@ not_inside = doTheThing(*groups, only_inside_group=False, verbose=False)
 
 # %%
 print('Wewnątrz')
-inside.groupby(['group', 'username']).count().reset_index().groupby('group').agg({'username': 'count', 'mentioned': 'sum'})
-#%%
+inside.groupby(['group', 'username']).count().reset_index().groupby(
+    'group').agg({'username': 'count', 'mentioned': 'sum'})
+# %%
 print('Ogólne mentiony')
-not_inside.groupby(['group', 'username']).count().reset_index().groupby('group').agg({'username': 'count', 'mentioned': 'sum'})
+not_inside.groupby(['group', 'username']).count().reset_index().groupby(
+    'group').agg({'username': 'count', 'mentioned': 'sum'})
 
-#%%
+# %%

@@ -15,10 +15,16 @@ from langdetect import detect_langs
 from tqdm import tqdm
 
 GROUPS = ['musicians',
-          'actors', 
+          'actors',
           'celebrities',
           'athletes',
           'politicians']
+
+TWEETS_DIR = 'tweets'
+TWEETS_FILENAME = 'tweets.csv'
+USERS_FILENAME = 'users.csv'
+TEMP_DIR = '.tmp'
+USERS_LIST_DIR = 'users_lists'
 
 
 def get_batch(groups, group_name, batch_size: int, batch_idx: int):
@@ -182,7 +188,7 @@ def only_lang_users(nicks_csv_path: str, output_path: str = None, lang: str = 'e
     return lang_users
 
 
-def preprocess_tweets(tweets: Sequence[str], lemma:bool=True, remove_url:bool=True, remove_mentions:bool=True) -> Sequence[str]:
+def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: bool = True, remove_mentions: bool = True) -> Sequence[str]:
     lemmatizer = nltk.stem.WordNetLemmatizer()
     preprocessed_tweets = []
     for tweet in tqdm(tweets, desc='preprocessing tweets'):
@@ -197,4 +203,3 @@ def preprocess_tweets(tweets: Sequence[str], lemma:bool=True, remove_url:bool=Tr
         if tweet:
             preprocessed_tweets.append(tweet)
     return preprocessed_tweets
-
