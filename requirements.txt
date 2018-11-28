@@ -7,3 +7,4 @@ twint
 aiohttp-socks
 langdetect
 nltk
+# graph-tool

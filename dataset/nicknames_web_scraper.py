@@ -11,9 +11,10 @@ import twint
 from lxml import html
 from tqdm import tqdm
 
-from _utils import *
+from .utils import *
+from ..config import *
 
-__all__ = ['download_category', 'filter_and_export']
+__all__ = ['download_dataset']
 
 
 
@@ -76,10 +77,22 @@ def find_categories_on_main_page(url: str) -> List[str]:
     return list(filter(lambda cat: not cat.startswith(r'top_users') and not re.findall('view', cat), cats))
 
 
-def filter_and_export(categories, groups):
+def filter_and_export(categories: Sequence[str], groups: Dict[str, Sequence[str]]):
     try:
-        groups['politicians'].extend(map(lambda elem: elem.lower(), list(pd.read_csv('./adds/politicians.csv'))))
-        groups['musicians'].extend(list(map(lambda elem: str(elem[1:]).lower(), filter(lambda elem: elem != 'nan', pd.read_csv('./adds/most_popular_musicians.csv', header=0)['Twitter handle'].astype(str)))))
+        politicians = list(pd.read_csv(os.path.join(USERLISTS_HELPERS_DIR, 'politicians.csv')))
+        politicians = list(map(lambda elem: elem.lower(), politicians))
+        groups['politicians'].extend(politicians)
+        del politicians
+    except FileNotFoundError as e:
+        print(e)
+        
+    try:
+        musicians = pd.read_csv(os.path.join(USERLISTS_HELPERS_DIR, 'most_popular_musicians.csv'), header=0)
+        musicians = musicians['Twitter handle'].astype(str)
+        musicians = filter(lambda elem: elem != 'nan', musicians)
+        musicians = list(map(lambda elem: str(elem[1:]).lower(), musicians))
+        groups['musicians'].extend(musicians)
+        del musicians
     except FileNotFoundError as e:
         print(e)
 
@@ -92,3 +105,7 @@ def filter_and_export(categories, groups):
             f.write('\n'.join(filtered_group[group]))
 
     summary_dict(filtered_group, 'Summary')
+
+def download_dataset(groups_names:Sequence[str]=GROUPS):
+    groups = download_category(*groups_names)
+    filter_and_export(groups_names, groups)
