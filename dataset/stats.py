@@ -8,9 +8,10 @@ from itertools import chain
 
 import numpy as np
 import pandas as pd
-from tqdm.autonotebook import tqdm
+from tqdm import tqdm
 
 from _utils import GROUPS
+tqdm.pandas()
 
 __all__ = ['get_top_followers',
            'get_mentioned_users_from_tweet',
@@ -82,6 +83,41 @@ def get_mentions(groups):
 
 # %%
 # get_top_followers(10000, 5, True)
+# groups = GROUPS if sys.argv[1] in ['all', 'ALL', '-a', '--all'] else sys.argv[1:]
+# get_mentions(groups)
 
-groups = GROUPS if sys.argv[1] in ['all', 'ALL', '-a', '--all'] else sys.argv[1:]
-get_mentions(groups)
+# %%
+def doTheThing(*groups, only_inside_group=False, verbose=True):
+    all_mentions = []
+    gbar = tqdm(groups, desc='Group', disable=not verbose)
+    for group in gbar:
+        gbar.set_postfix(group=group)
+        with open(f'.tmp/{group}_mentions.pkl', 'rb') as f:
+            mentions = pkl.load(f, fix_imports=True)
+        mentions = mentions.drop_duplicates()
+        mentions = mentions[mentions.username != mentions.mentioned]
+        if only_inside_group:
+            mentions = mentions[mentions.apply(lambda x: x.mentioned in x.username,
+                                                        axis='columns')]
+        all_mentions.append(mentions)
+
+    mentions = pd.concat(all_mentions, ignore_index=True)
+    outfile_path = os.path.join(TEMP_DIR, 'all_mentions.pkl')
+    with open(outfile_path, 'wb') as f:
+        print(f'Saving pickle to {outfile_path}')
+        pkl.dump(mentions, f)
+    return mentions
+
+groups = GROUPS
+
+inside = doTheThing(*groups, only_inside_group=True, verbose=False)
+not_inside = doTheThing(*groups, only_inside_group=False, verbose=False)
+
+# %%
+print('Wewnątrz')
+inside.groupby(['group', 'username']).count().reset_index().groupby('group').agg({'username': 'count', 'mentioned': 'sum'})
+#%%
+print('Ogólne mentiony')
+not_inside.groupby(['group', 'username']).count().reset_index().groupby('group').agg({'username': 'count', 'mentioned': 'sum'})
+
+#%%

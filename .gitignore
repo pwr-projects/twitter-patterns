@@ -155,3 +155,5 @@ pip-selfcheck.json
 .*
 # dataset/
 dataset/temp
+dataset/tweets
+dataset/adds
