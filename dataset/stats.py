@@ -1,5 +1,3 @@
-#!/bin/python3.6
-# %%
 import os
 import pickle as pkl
 import re
@@ -10,22 +8,13 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from _utils import *
+from .utils import *
+from .config import *
 
-tqdm.pandas()
 
 __all__ = ['get_top_followers',
            'get_mentioned_users_from_tweet',
            'get_mentions']
-
-
-# %%
-
-
-if not os.path.isdir(TEMP_DIR):
-    os.mkdir(TEMP_DIR)
-# %%
-
 
 def get_top_followers(threshold: int = 10000, top: bool = False, top_n=None):
     all_users = []
@@ -79,12 +68,6 @@ def get_mentions(groups):
             pkl.dump(pd.DataFrame(mentions_dict).drop_duplicates(), f)
 
 
-# %%
-# get_top_followers(10000, 5, True)
-# groups = GROUPS if sys.argv[1] in ['all', 'ALL', '-a', '--all'] else sys.argv[1:]
-# get_mentions(groups)
-
-# %%
 def doTheThing(*groups, only_inside_group=False, verbose=True):
     all_mentions = []
     gbar = tqdm(groups, desc='Group', disable=not verbose)
@@ -107,18 +90,15 @@ def doTheThing(*groups, only_inside_group=False, verbose=True):
     return mentions
 
 
-groups = GROUPS
+def group(data):
+    data = data.groupby(['group', 'username']).count().reset_index()
+    return data.groupby('group').agg({'username': 'count', 'mentioned': 'sum'})
 
-inside = doTheThing(*groups, only_inside_group=True, verbose=False)
-not_inside = doTheThing(*groups, only_inside_group=False, verbose=False)
 
-# %%
-print('Wewnątrz')
-inside.groupby(['group', 'username']).count().reset_index().groupby(
-    'group').agg({'username': 'count', 'mentioned': 'sum'})
-# %%
-print('Ogólne mentiony')
-not_inside.groupby(['group', 'username']).count().reset_index().groupby(
-    'group').agg({'username': 'count', 'mentioned': 'sum'})
-
-# %%
+def print_stats(groups=GROUPS):
+    inside = doTheThing(*groups, only_inside_group=True, verbose=False)
+    not_inside = doTheThing(*groups, only_inside_group=False, verbose=False)
+    print('Wewnątrz')
+    print(group(inside))
+    print('Ogólne mentiony')
+    print(group(not_inside))

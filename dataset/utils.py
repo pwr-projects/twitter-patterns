@@ -1,4 +1,3 @@
-#!/bin/python
 import os
 import re
 import shutil
@@ -14,17 +13,7 @@ import twint
 from langdetect import detect_langs
 from tqdm import tqdm
 
-GROUPS = ['musicians',
-          'actors',
-          'celebrities',
-          'athletes',
-          'politicians']
-
-TWEETS_DIR = 'tweets'
-TWEETS_FILENAME = 'tweets.csv'
-USERS_FILENAME = 'users.csv'
-TEMP_DIR = '.tmp'
-USERS_LIST_DIR = 'users_lists'
+from config import *
 
 
 def get_batch(groups, group_name, batch_size: int, batch_idx: int):
@@ -58,13 +47,13 @@ def to_lower(strs: Sequence['str']):
 
 
 def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
-    if os.path.isdir('hashtags'):
-        shutil.rmtree('hashtags')
+    if os.path.isdir(HASHTAG_DIR):
+        shutil.rmtree(HASHTAG_DIR)
     config = twint.Config()
     config.Search = ' '.join('#' + hashtag for hashtag in hashtags)
     config.Lang = 'en'
     config.Store_csv = True
-    config.Output = 'temp/hashtags'
+    config.Output = HASHTAG_DIR
     config.User_full = True
     config.Followers = True
     config.Limit = tweets_limit
@@ -79,35 +68,33 @@ def scrap_tweets(user: str, group: str, limit: int = 100000):
     config = twint.Config()
     config.Username = user
     config.Limit = limit
-    config.Output = f'tweets/{group}'
+    config.Output = os.path.join(TWEETS_DIR, group)
     config.Store_csv = True
     config.Lang = 'en'
-    config.Custom['group'] = group
     config.Hide_output = False
     config.Format = '{id}'
     twint.run.Search(config)
 
 
-def download_followers(username: str, usergroup: str, function=twint.run.Followers):
+def download_followers(username: str, usergroup: str='', function=twint.run.Followers):
     config = twint.Config()
     config.Username = username
     config.Lang = 'en'
     config.Store_csv = True
-    config.Output = f'followers/{usergroup}/{username}.csv'
-    # config.Limit = limit
+    config.Output = os.path.join(FOLLOWERS_DIR, usergroup, username)
     config.Lowercase = True
-    # config.Hide_output = True
     function(config)
 
 
-def extract_tweet_authors() -> Sequence[str]:
-    content = pd.read_csv('temp/hashtags/tweets.csv', header=0)
+def extract_tweet_authors(tweets_dir: str) -> Sequence[str]:
+    content = pd.read_csv(os.path.join(tweets_dir, TWEETS_FILENAME), header=0)
     return content.username.unique()
 
 
-def get_users_with_lower_bound(min_followers: int = 10000) -> Sequence[str]:
+def get_users_with_lower_bound(users_dir: str, min_followers: int = 10000) -> Sequence[str]:
     assert min_followers > 0, 'min_followers should be greater than 0'
-    content = pd.read_csv('temp/followers/users.csv', header=0)[['username', 'followers']].drop_duplicates('username')
+    content = pd.read_csv(os.path.join(users_dir, USERS_FILENAME), header=0)
+    content = content[['username', 'followers']].drop_duplicates('username')
     return to_lower(content[content.followers > min_followers].username)
 
 
@@ -121,23 +108,23 @@ def add_not_duplicates(groups: Dict[str, Set[str]], category: str, users: Sequen
     return groups
 
 
-def create_group_dict(*categories: Sequence[str]) -> Dict[str, Set[str]]:
+def create_group_dict_from_userlists(*categories: Sequence[str]) -> Dict[str, Set[str]]:
     groups = {}
     for category in tqdm(categories, 'Reading group file'):
-        with open(f'{category}.txt', mode='r') as f:
+        with open(os.path.join(USERS_LIST_DIR, f'{category}.txt'), mode='r') as f:
             users = set(map(lambda elem: elem.strip(), f.readlines()))
         groups[category] = users
     return groups
 
 
-def create_group_dict_from_tweets(*categories: Sequence[str]) -> Dict[str, Set[str]]:
+def create_group_dict_from_tweets(*categories: Sequence[str], tweets_dir: str = TWEETS_DIR) -> Dict[str, Set[str]]:
     groups = {}
     for category in tqdm(categories, 'Reading tweet file'):
-        groups[category] = pd.read_csv(f'tweets/{category}/tweets.csv').username.unique().tolist()
+        groups[category] = pd.read_csv(os.path.join(tweets_dir, category, TWEETS_FILENAME)).username.unique().tolist()
     return groups
 
 
-def export_dict_to_files(groups: Dict[str, Set[str]]):
+def export_users_dict_to_files(groups: Dict[str, Set[str]], outdir: str = TEMP_DIR):
     for group_name, users in groups.items():
         outpath = f'{group_name}.txt'
         print(f'Exporting {group_name} to {outpath}')
@@ -146,9 +133,9 @@ def export_dict_to_files(groups: Dict[str, Set[str]]):
 
 
 def merge_with_scraped(group_name: str, other_users: Sequence['str']):
-    groups = create_group_dict(group_name)
+    groups = create_group_dict_from_userlists(group_name)
     groups = add_not_duplicates(groups, group_name, other_users)
-    export_dict_to_files(groups)
+    export_users_dict_to_files(groups)
     return groups
 
 
@@ -203,3 +190,12 @@ def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: boo
         if tweet:
             preprocessed_tweets.append(tweet)
     return preprocessed_tweets
+
+
+def get_extra_user_from_hashtags(group_name:str, low_followers_bound:int, *hashtags:Sequence[str]):
+    download_hashtags(hashtags, tweets_limit=100000)
+
+    for user in tqdm(extract_tweet_authors(HASHTAG_DIR), 'Downloading users followers'):
+        download_followers(user)
+
+    merge_with_scraped(group_name, get_users_with_lower_bound(FOLLOWERS_DIR, min_followers=low_followers_bound))
