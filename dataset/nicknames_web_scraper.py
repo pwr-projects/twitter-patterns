@@ -12,7 +12,7 @@ from lxml import html
 from tqdm import tqdm
 
 from .utils import *
-from ..config import *
+from config import *
 
 __all__ = ['download_dataset']
 

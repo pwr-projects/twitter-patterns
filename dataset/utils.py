@@ -15,6 +15,15 @@ from tqdm import tqdm
 
 from config import *
 
+__all__ = [
+    'get_batch',
+    'summary_dict',
+    'find_duplicates',
+    'get_extra_user_from_hashtags',
+    'to_lower',
+    'preprocess_tweets'
+]
+
 
 def get_batch(groups, group_name, batch_size: int, batch_idx: int):
     data = list(groups[group_name])
@@ -76,7 +85,7 @@ def scrap_tweets(user: str, group: str, limit: int = 100000):
     twint.run.Search(config)
 
 
-def download_followers(username: str, usergroup: str='', function=twint.run.Followers):
+def download_followers(username: str, usergroup: str = '', function=twint.run.Followers):
     config = twint.Config()
     config.Username = username
     config.Lang = 'en'
@@ -139,8 +148,11 @@ def merge_with_scraped(group_name: str, other_users: Sequence['str']):
     return groups
 
 
-def tweeter_user_lang_detect(
-        user: str, limit: int = 10, csv_path: str = 'tweets/tweets.csv', delete_csv: bool = True, scrap: bool = True) ->str:
+def tweeter_user_lang_detect(user: str,
+                             limit: int = 10,
+                             csv_path: str = os.path.join(TWEETS_DIR, TWEETS_FILENAME),
+                             delete_csv: bool = True,
+                             scrap: bool = True) -> str:
     try:
         if scrap:
             scrap_tweets(user=user, limit=limit, group='')
@@ -192,7 +204,7 @@ def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: boo
     return preprocessed_tweets
 
 
-def get_extra_user_from_hashtags(group_name:str, low_followers_bound:int, *hashtags:Sequence[str]):
+def get_extra_user_from_hashtags(group_name: str, low_followers_bound: int, *hashtags: Sequence[str]):
     download_hashtags(hashtags, tweets_limit=100000)
 
     for user in tqdm(extract_tweet_authors(HASHTAG_DIR), 'Downloading users followers'):
