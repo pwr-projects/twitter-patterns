@@ -12,11 +12,6 @@ from config import *
 
 from .utils import *
 
-__all__ = ['get_top_followers',
-           'get_mentioned_users_from_tweet',
-           'get_mentions',
-           'print_stats']
-
 
 def get_top_followers(threshold: int = 10000, top: bool = False, top_n=None):
     all_users = []
@@ -39,6 +34,11 @@ def get_top_followers(threshold: int = 10000, top: bool = False, top_n=None):
 
 def get_mentioned_users_from_tweet(tweet: str):
     return list(map(lambda mention: mention.replace('@', ''), re.findall(r'@[\w\d]+', tweet)))
+
+
+def get_mentions_from_tweet_with_idx(idx_tweet):
+    mentions = get_mentioned_users_from_tweet(idx_tweet[1])
+    return [[idx_tweet[0], ] * len(mentions), mentions]
 
 
 def extract_mentions(group):
@@ -66,13 +66,56 @@ def extract_mentions(group):
 
     for user in tqdm(unique_users, 'Mentions: extract', leave=False):
         mentions = list(chain(*map(get_mentioned_users_from_tweet,
-                                   tqdm(tweets[tweets.username == user].tweet.values,
-                                        'Tweet', leave=False))))
+                                   tweets[tweets.username == user].tweet.values)))
 
         for mentioned_user in mentions:
             mentions_dict['group'].append(group)
             mentions_dict['username'].append(user)
             mentions_dict['mentioned'].append(mentioned_user)
+
+    with open(outfile_path, 'wb') as f:
+        pkl.dump(pd.DataFrame(mentions_dict).drop_duplicates(), f)
+
+# TO TEST
+
+
+def extract_mentions_faster(group, chunksize=1000):
+    mentions_dict = {'group': [], 'username': [], 'mentioned': []}
+
+    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
+    override = True
+
+    if os.path.isfile(outfile_path):
+        answer = input('Be careful ;_; File exists. Override? ')
+        override = answer not in 'Nn'
+
+    if not override:
+        with open(outfile_path, 'rb') as f:
+            print(f'Loading {group} mention from {outfile_path}...')
+            return pkl.load(f)
+
+    tweets_path = os.path.join(TWEETS_DIR, group, TWEETS_FILENAME)
+    for data in tqdm(pd.read_csv(tweets_path,
+                                 header=0,
+                                 chunksize=chunksize,
+                                 dtype=str),
+                     'Mentions: extract',
+                     total=int((wc(tweets_path) - 1) / chunksize),
+                     leave=False):
+        mentions = chain(map(get_mentions_from_tweet_with_idx,
+                             enumerate(data.tweet.values)))
+
+        mentions = np.array(list(filter(lambda x: len(x[1]), mentions)), object)
+
+        if not mentions.size:
+            continue
+            
+        ids = list(chain(*mentions[:, 0]))
+        groups = [group, ] * len(ids)
+        
+        mentions_dict['group'].extend(groups)
+        mentions_dict['username'].extend(np.take(data.username.tolist(), ids))
+        mentions_dict['mentioned'].extend(list(chain(*mentions[:, 1])))
 
     with open(outfile_path, 'wb') as f:
         pkl.dump(pd.DataFrame(mentions_dict).drop_duplicates(), f)
@@ -96,7 +139,7 @@ def get_mentions(only_classified_users=False):
         mention_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
 
         if not os.path.isfile(mention_path):
-            extract_mentions(group)
+            extract_mentions_faster(group)
 
         with open(mention_path, 'rb') as f:
             mentions = pkl.load(f, fix_imports=True)
@@ -106,13 +149,12 @@ def get_mentions(only_classified_users=False):
 
         all_mentions.append(mentions)
 
-
     mentions = pd.concat(all_mentions, ignore_index=True)
     unique_usernames = mentions.username.unique()
     if only_classified_users:
         tqdm.pandas(desc='Processing mentions')
         mentions = mentions[mentions.progress_apply(lambda x: x.mentioned in unique_usernames,
-                                           axis='columns')]
+                                                    axis='columns')]
 
     with open(all_mentions_path, 'wb') as f:
         print(f'Saving all mentions to {all_mentions_path}...')
@@ -129,7 +171,9 @@ def get_stats(data):
 def print_stats(groups=GROUPS):
     inside = get_mentions(True)
     not_inside = get_mentions(False)
+
     print('Only inside')
     print(get_stats(inside))
-    print('Ogólne mentiony')
+    print()
+    print('Every mention')
     print(get_stats(not_inside))
