@@ -4,6 +4,7 @@ import shutil
 import string
 from collections import Counter, defaultdict
 from itertools import chain, product
+from subprocess import check_output
 from typing import Dict, Sequence, Set
 
 import nltk
@@ -21,8 +22,13 @@ __all__ = [
     'find_duplicates',
     'get_extra_user_from_hashtags',
     'to_lower',
-    'preprocess_tweets'
+    'preprocess_tweets',
+    'wc'
 ]
+
+
+def wc(filename):
+    return int(check_output(['wc', '-l', filename]).split()[0])
 
 
 def get_batch(groups, group_name, batch_size: int, batch_idx: int):

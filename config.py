@@ -1,7 +1,9 @@
 import os
 import shutil
+
 from tqdm import tqdm
-tqdm.pandas()
+
+# tqdm.pandas()
 
 GROUPS = ['musicians',
           'actors',
@@ -13,6 +15,7 @@ TWEETS_FILENAME = 'tweets.csv'
 USERS_FILENAME = 'users.csv'
 TEMP_DIR = '.tmp'
 DATASET_DIR = 'dataset'
+RESOURCE_DIR = 'res'
 
 TWEETS_DIR = os.path.join(DATASET_DIR, 'tweets')
 USERS_LIST_DIR = os.path.join(DATASET_DIR, 'users_lists')
@@ -34,5 +37,6 @@ for dir_path in (TWEETS_DIR,
                  USERLISTS_HELPERS_DIR,
                  FOLLOWERS_DIR,
                  HASHTAG_DIR,
+                 RESOURCE_DIR,
                  TEMP_DIR):
     create_dir_if_not_exist(dir_path)
