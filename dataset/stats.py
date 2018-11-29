@@ -8,13 +8,15 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from .utils import *
-from .config import *
+from config import *
 
+from .utils import *
 
 __all__ = ['get_top_followers',
            'get_mentioned_users_from_tweet',
-           'get_mentions']
+           'get_mentions',
+           'print_stats']
+
 
 def get_top_followers(threshold: int = 10000, top: bool = False, top_n=None):
     all_users = []
@@ -39,66 +41,95 @@ def get_mentioned_users_from_tweet(tweet: str):
     return list(map(lambda mention: mention.replace('@', ''), re.findall(r'@[\w\d]+', tweet)))
 
 
-def get_mentions(groups):
+def extract_mentions(group):
     mentions_dict = {'group': [], 'username': [], 'mentioned': []}
 
-    gbar = tqdm(groups, 'Group')
-    for group in gbar:
-        gbar.set_postfix(group=group)
-        outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
-        override = True
-        if os.path.isfile(outfile_path):
-            answer = input('Be careful ;_; File exists. Override? ')
-            override = answer not in 'Nn'
-        if not override:
-            continue
+    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
+    override = True
 
-        tweets = pd.read_csv(os.path.join(TWEETS_DIR, group, TWEETS_FILENAME), header=0, low_memory=False)
-        ubar = tqdm(tweets.username.unique(), 'User')
-        for user in ubar:
-            ubar.set_postfix(user=user)
-            mentions = list(chain(*map(get_mentioned_users_from_tweet,
-                                       tqdm(tweets[tweets.username == user].tweet.values, 'Tweet'))))
-            for mentioned_user in mentions:
-                mentions_dict['group'].append(group)
-                mentions_dict['username'].append(user)
-                mentions_dict['mentioned'].append(mentioned_user)
+    if os.path.isfile(outfile_path):
+        answer = input('Be careful ;_; File exists. Override? ')
+        override = answer not in 'Nn'
 
-        with open(outfile_path, 'wb') as f:
-            pkl.dump(pd.DataFrame(mentions_dict).drop_duplicates(), f)
+    if not override:
+        with open(outfile_path, 'rb') as f:
+            print(f'Loading {group} mention from {outfile_path}...')
+            return pkl.load(f)
+
+    tweets = pd.read_csv(os.path.join(TWEETS_DIR, group, TWEETS_FILENAME),
+                         header=0,
+                         memory_map=True,
+                         dtype=str)
+
+    unique_users = tweets.username.unique()
+    max_name_length = max(map(len, unique_users))
+
+    for user in tqdm(unique_users, 'Mentions: extract', leave=False):
+        mentions = list(chain(*map(get_mentioned_users_from_tweet,
+                                   tqdm(tweets[tweets.username == user].tweet.values,
+                                        'Tweet', leave=False))))
+
+        for mentioned_user in mentions:
+            mentions_dict['group'].append(group)
+            mentions_dict['username'].append(user)
+            mentions_dict['mentioned'].append(mentioned_user)
+
+    with open(outfile_path, 'wb') as f:
+        pkl.dump(pd.DataFrame(mentions_dict).drop_duplicates(), f)
 
 
-def doTheThing(*groups, only_inside_group=False, verbose=True):
+def get_mentions(only_classified_users=False):
     all_mentions = []
-    gbar = tqdm(groups, desc='Group', disable=not verbose)
+
+    only_classified_group_str = 'inside' if only_classified_users else 'outside'
+    all_mentions_path = os.path.join(TEMP_DIR, f'all_mentions_{only_classified_group_str}.pkl')
+
+    if os.path.isfile(all_mentions_path):
+        print(f'Found all mentions in {all_mentions_path}. Loading...')
+        with open(all_mentions_path, 'rb') as f:
+            return pkl.load(f)
+
+    gbar = tqdm(GROUPS, 'Mentions: process', leave=False)
     for group in gbar:
         gbar.set_postfix(group=group)
-        with open(f'.tmp/{group}_mentions.pkl', 'rb') as f:
+
+        mention_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
+
+        if not os.path.isfile(mention_path):
+            extract_mentions(group)
+
+        with open(mention_path, 'rb') as f:
             mentions = pkl.load(f, fix_imports=True)
+
         mentions = mentions.drop_duplicates()
         mentions = mentions[mentions.username != mentions.mentioned]
-        if only_inside_group:
-            mentions = mentions[mentions.apply(lambda x: x.mentioned in x.username,
-                                               axis='columns')]
+
         all_mentions.append(mentions)
 
+
     mentions = pd.concat(all_mentions, ignore_index=True)
-    outfile_path = os.path.join(TEMP_DIR, 'all_mentions.pkl')
-    with open(outfile_path, 'wb') as f:
-        print(f'Saving pickle to {outfile_path}')
+    unique_usernames = mentions.username.unique()
+    if only_classified_users:
+        tqdm.pandas(desc='Processing mentions')
+        mentions = mentions[mentions.progress_apply(lambda x: x.mentioned in unique_usernames,
+                                           axis='columns')]
+
+    with open(all_mentions_path, 'wb') as f:
+        print(f'Saving all mentions to {all_mentions_path}...')
         pkl.dump(mentions, f)
+
     return mentions
 
 
-def group(data):
+def get_stats(data):
     data = data.groupby(['group', 'username']).count().reset_index()
     return data.groupby('group').agg({'username': 'count', 'mentioned': 'sum'})
 
 
 def print_stats(groups=GROUPS):
-    inside = doTheThing(*groups, only_inside_group=True, verbose=False)
-    not_inside = doTheThing(*groups, only_inside_group=False, verbose=False)
-    print('Wewnątrz')
-    print(group(inside))
+    inside = get_mentions(True)
+    not_inside = get_mentions(False)
+    print('Only inside')
+    print(get_stats(inside))
     print('Ogólne mentiony')
-    print(group(not_inside))
+    print(get_stats(not_inside))
