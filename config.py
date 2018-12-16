@@ -3,11 +3,11 @@ import shutil
 
 from tqdm import tqdm
 
-# tqdm.pandas()
+tqdm.pandas()
 
 GROUPS = ['musicians',
           'actors',
-          'celebrities',
+        #   'celebrities',
           'athletes',
           'politicians']
 
@@ -23,6 +23,10 @@ RAW_USERLISTS_FROM_PAGE = os.path.join(USERS_LIST_DIR, 'raw')
 USERLISTS_HELPERS_DIR = os.path.join(USERS_LIST_DIR, 'helpers')
 FOLLOWERS_DIR = os.path.join(DATASET_DIR, 'followers')
 HASHTAG_DIR = os.path.join(DATASET_DIR, 'hashtag')
+
+
+def only_classified_users_str(itis: bool):
+    return 'inside' if itis else 'outside'
 
 
 def create_dir_if_not_exist(dir_path):

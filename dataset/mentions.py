@@ -42,20 +42,13 @@ def get_mentions_from_tweet_with_idx(idx_tweet):
 
 
 def extract_mentions(group):
-    mentions_dict = {'group': [], 'username': [], 'mentioned': []}
-
-    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
-    override = True
+    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.csv')
 
     if os.path.isfile(outfile_path):
-        answer = input('Be careful ;_; File exists. Override? ')
-        override = answer not in 'Nn'
+        print(f'Loading {group} mention from {outfile_path}...')
+        return pd.read_csv(outfile_path, header=0)
 
-    if not override:
-        with open(outfile_path, 'rb') as f:
-            print(f'Loading {group} mention from {outfile_path}...')
-            return pkl.load(f)
-
+    mentions_dict = {'group': [], 'username': [], 'mentioned': []}
     tweets = pd.read_csv(os.path.join(TWEETS_DIR, group, TWEETS_FILENAME),
                          header=0,
                          memory_map=True,
@@ -73,26 +66,17 @@ def extract_mentions(group):
             mentions_dict['username'].append(user)
             mentions_dict['mentioned'].append(mentioned_user)
 
-    with open(outfile_path, 'wb') as f:
-        pkl.dump(pd.DataFrame(mentions_dict).drop_duplicates(), f)
-
-# TO TEST
+    pd.DataFrame(mentions_dict).drop_duplicates().to_csv(outfile_path, index=False)
 
 
-def extract_mentions_faster(group, chunksize=1000):
+def extract_mentions_faster(group):
     mentions_dict = {'group': [], 'username': [], 'mentioned': []}
 
-    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
-    override = True
+    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.csv')
 
     if os.path.isfile(outfile_path):
-        answer = input('Be careful ;_; File exists. Override? ')
-        override = answer not in 'Nn'
-
-    if not override:
-        with open(outfile_path, 'rb') as f:
-            print(f'Loading {group} mention from {outfile_path}...')
-            return pkl.load(f)
+        print(f'Loading {group} mention from {outfile_path}...')
+        return pd.read_csv(outfile_path, header=0)
 
     tweets_path = os.path.join(TWEETS_DIR, group, TWEETS_FILENAME)
     for data in tqdm(pd.read_csv(tweets_path,
@@ -109,71 +93,48 @@ def extract_mentions_faster(group, chunksize=1000):
 
         if not mentions.size:
             continue
-            
+
         ids = list(chain(*mentions[:, 0]))
         groups = [group, ] * len(ids)
-        
+
         mentions_dict['group'].extend(groups)
         mentions_dict['username'].extend(np.take(data.username.tolist(), ids))
         mentions_dict['mentioned'].extend(list(chain(*mentions[:, 1])))
 
-    with open(outfile_path, 'wb') as f:
-        pkl.dump(pd.DataFrame(mentions_dict).drop_duplicates(), f)
+    mentions = pd.DataFrame(mentions_dict).drop_duplicates()
+    mentions = mentions[mentions.username != mentions.mentioned]
+    mentions.to_csv(outfile_path, index=False)
+    return mentions
+
+
+def get_mentions_path(only_classified_users):
+    only_for_classified = only_classified_users_str(only_classified_users)
+    all_mention_path = os.path.join(TEMP_DIR, f'all_mentions_{only_for_classified}.csv')
+    return all_mention_path, os.path.isfile(all_mention_path)
 
 
 def get_mentions(only_classified_users=False):
+    all_mentions_path, _ = get_mentions_path(only_classified_users)
     all_mentions = []
-
-    only_classified_group_str = 'inside' if only_classified_users else 'outside'
-    all_mentions_path = os.path.join(TEMP_DIR, f'all_mentions_{only_classified_group_str}.pkl')
 
     if os.path.isfile(all_mentions_path):
         print(f'Found all mentions in {all_mentions_path}. Loading...')
-        with open(all_mentions_path, 'rb') as f:
-            return pkl.load(f)
+        return pd.read_csv(all_mentions_path, header=0)
 
     gbar = tqdm(GROUPS, 'Mentions: process', leave=False)
     for group in gbar:
         gbar.set_postfix(group=group)
-
-        mention_path = os.path.join(TEMP_DIR, f'{group}_mentions.pkl')
-
-        if not os.path.isfile(mention_path):
-            extract_mentions_faster(group)
-
-        with open(mention_path, 'rb') as f:
-            mentions = pkl.load(f, fix_imports=True)
-
-        mentions = mentions.drop_duplicates()
-        mentions = mentions[mentions.username != mentions.mentioned]
-
+        mentions = extract_mentions_faster(group)
         all_mentions.append(mentions)
 
     mentions = pd.concat(all_mentions, ignore_index=True)
     unique_usernames = mentions.username.unique()
+
     if only_classified_users:
         tqdm.pandas(desc='Processing mentions')
         mentions = mentions[mentions.progress_apply(lambda x: x.mentioned in unique_usernames,
                                                     axis='columns')]
 
-    with open(all_mentions_path, 'wb') as f:
-        print(f'Saving all mentions to {all_mentions_path}...')
-        pkl.dump(mentions, f)
-
+    print(f'Saving all mentions to {all_mentions_path}...')
+    mentions.to_csv(all_mentions_path, index=False)
     return mentions
-
-
-def get_stats(data):
-    data = data.groupby(['group', 'username']).count().reset_index()
-    return data.groupby('group').agg({'username': 'count', 'mentioned': 'sum'})
-
-
-def print_stats(groups=GROUPS):
-    inside = get_mentions(True)
-    not_inside = get_mentions(False)
-
-    print('Only inside')
-    print(get_stats(inside))
-    print()
-    print('Every mention')
-    print(get_stats(not_inside))
