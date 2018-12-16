@@ -2,7 +2,7 @@ import os
 import re
 from collections import Counter
 from itertools import chain
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -13,9 +13,6 @@ from tqdm import tqdm
 
 from .utils import *
 from config import *
-
-__all__ = ['download_dataset']
-
 
 
 def get_twitter_urls(category: str, min_no_of_users: int) -> List[str]:
@@ -56,13 +53,17 @@ def download_category(*categories: List[str], min_no_of_users: int = 100) -> Lis
     usernames = {category: list() for category in categories}
 
     with tqdm(categories, desc='Getting category users', leave=False) as cbar:
-        for category in cbar:
-            cbar.set_postfix(category=category)
-            urls = get_twitter_urls(category, min_no_of_users)
+        for group in cbar:
+            cbar.set_postfix(group=group)
+            urls = get_twitter_urls(group, min_no_of_users)
             if not urls:
-                raise Exception(f'Cannot download html for category {category}')
-            add_nicknames_from_urls(urls, usernames, category)
-    return {k: list(map(lambda elem: elem.lower(), v)) for k, v in usernames.items() if k in categories}
+                raise Exception(f'Cannot download html for category {group}')
+            add_nicknames_from_urls(urls, usernames, group)
+
+            with open(os.path.join(RAW_USERLISTS_FROM_PAGE, f'{group}.txt'), 'w') as f:
+                f.write('\n'.join(usernames[group]))
+
+    return {k: set(map(lambda elem: elem.lower(), v)) for k, v in usernames.items() if k in categories}
 
 
 def find_categories_on_main_page(url: str) -> List[str]:
@@ -77,35 +78,35 @@ def find_categories_on_main_page(url: str) -> List[str]:
     return list(filter(lambda cat: not cat.startswith(r'top_users') and not re.findall('view', cat), cats))
 
 
-def filter_and_export(categories: Sequence[str], groups: Dict[str, Sequence[str]]):
+def filter_and_export(categories: Sequence[str], groups: Dict[str, Set[str]]):
     try:
-        politicians = list(pd.read_csv(os.path.join(USERLISTS_HELPERS_DIR, 'politicians.csv')))
-        politicians = list(map(lambda elem: elem.lower(), politicians))
-        groups['politicians'].extend(politicians)
+        politicians = load_userlist_from_file('politicians.txt', USERLISTS_HELPERS_DIR)
+        politicians = set(map(lambda elem: elem.lower(), politicians))
+        groups['politicians'].update(politicians)
         del politicians
     except FileNotFoundError as e:
         print(e)
-        
+
     try:
-        musicians = pd.read_csv(os.path.join(USERLISTS_HELPERS_DIR, 'most_popular_musicians.csv'), header=0)
+        musicians = pd.read_csv(os.path.join(USERLISTS_HELPERS_DIR, 'musicians.csv'), header=0)
         musicians = musicians['Twitter handle'].astype(str)
         musicians = filter(lambda elem: elem != 'nan', musicians)
-        musicians = list(map(lambda elem: str(elem[1:]).lower(), musicians))
-        groups['musicians'].extend(musicians)
+        musicians = set(map(lambda elem: str(elem[1:]).lower(), musicians))
+        groups['musicians'].update(musicians)
         del musicians
     except FileNotFoundError as e:
         print(e)
 
-    duplicated = find_duplicates(groups)
+    duplicated = get_duplicates_in_dict(groups)
 
     filtered_group = {}
     for group, users in tqdm(groups.items(), 'Filtering and exporting', leave=False):
-        with open(os.path.join(USERS_LIST_DIR, f'{group}.txt'), mode='w') as f:
-            filtered_group[group] = set(users) - duplicated
+        with open(os.path.join(USERS_LIST_DIR, f'{group}.txt'), 'w') as f:
+            filtered_group[group] = set([user.lower() for user in users]) - duplicated
             f.write('\n'.join(filtered_group[group]))
-
     summary_dict(filtered_group, 'Summary')
 
-def download_dataset(groups_names:Sequence[str]=GROUPS):
+
+def download_dataset(groups_names: Sequence[str] = GROUPS):
     groups = download_category(*groups_names)
     filter_and_export(groups_names, groups)
