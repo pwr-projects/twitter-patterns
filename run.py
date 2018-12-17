@@ -1,7 +1,9 @@
 #!/bin/python
+#%%
+import nltk
+import pandas as pd
 
+from dataset.mentions import *
 from dataset.utils import *
-from dataset.stats import *
 
-_ = get_mentions(False)
-_ = get_mentions(True)
+#%%

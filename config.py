@@ -7,7 +7,6 @@ tqdm.pandas()
 
 GROUPS = ['musicians',
           'actors',
-        #   'celebrities',
           'athletes',
           'politicians']
 
@@ -25,11 +24,11 @@ FOLLOWERS_DIR = os.path.join(DATASET_DIR, 'followers')
 HASHTAG_DIR = os.path.join(DATASET_DIR, 'hashtag')
 
 
-def only_classified_users_str(itis: bool):
+def only_classified_users_str(itis: bool) -> str:
     return 'inside' if itis else 'outside'
 
 
-def create_dir_if_not_exist(dir_path):
+def create_dir_if_not_exist(dir_path: str):
     if not os.path.isdir(dir_path):
         print(f'Creating {dir_path}...')
         os.makedirs(dir_path)

@@ -1,16 +1,17 @@
 # %%
-import numpy as np
-from itertools import chain
-from config import TWEETS_DIR, TWEETS_FILENAME, TEMP_DIR
-import pickle as pkl
 import os
+import pickle as pkl
+from itertools import chain
 from typing import Dict, Sequence
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from config import *
-from dataset.stats import *
+from config import (GROUPS, RESOURCE_DIR, TEMP_DIR, TWEETS_DIR,
+                    TWEETS_FILENAME, only_classified_users_str)
+
+from dataset import get_mentions_path, get_mentions, wc
 
 try:
     import graph_tool.all as gt
@@ -21,7 +22,7 @@ except ImportError:
 
 # %%
 
-def create_graph(only_classified_users, override=False):
+def create_graph(only_classified_users: bool, override: bool = False):
     only_for_classified = only_classified_users_str(only_classified_users)
     graph_path = os.path.join(TEMP_DIR, f'graph_{only_for_classified}.ml')
     graph_format = 'graphml'
@@ -113,7 +114,7 @@ state = gt.minimize_nested_blockmodel_dl(g, deg_corr=True, verbose=True)
 t = gt.get_hierarchy_tree(state)[0]
 tpos = pos = gt.radial_tree_layout(t, t.vertex(t.num_vertices() - 1), weighted=True)
 cts = gt.get_hierarchy_control_points(g, t, tpos)
-pos = g.own_property(tpos)3
+pos = g.own_property(tpos)
 b = state.levels[0].b
 shape = b.copy()
 shape.a %= 14
@@ -130,5 +131,3 @@ gt.graph_draw(g,
               display_props=[g.vp.group, g.vp.username],
               output=os.path.join(RESOURCE_DIR, 'graph.pdf'),
               )
-
-

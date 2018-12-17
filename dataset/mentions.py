@@ -8,32 +8,37 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from config import *
+from config import (GROUPS, TEMP_DIR, TWEETS_DIR, TWEETS_FILENAME,
+                    only_classified_users_str)
 
-from .utils import *
+from .utils import wc
+from .loaders import get_group_tweets
 
 
-def get_top_followers(threshold: int = 10000, top: bool = False, top_n=None):
+def get_top_followers(threshold: int = 10000, top_users_cnt=None):
     all_users = []
 
-    for group in GROUPS:
-        tweets = pd.read_csv(os.path.join(TWEETS_DIR, group, USERS_FILENAME), header=0)
-        tweets['group'] = group
+    for group_name in GROUPS:
+        tweets = get_group_tweets(group_name)
+        tweets['group'] = group_name
         all_users.append(tweets)
 
-    tweets: pd.DataFrame = pd.concat(all_users)
+    tweets = pd.concat(all_users)
     tweets = tweets[tweets.duplicated('username') == False]
     tweets = tweets[(tweets.followers > 0) & (tweets.followers <= threshold)]
     tweets = tweets[['group', 'username', 'followers']]
-
-    tweets = tweets.sort_values('followers', ascending=not top).groupby('group', sort=False)
-    tweets = tweets.head(top_n) if top_n else tweets
-    tweets = tweets.groupby(['group', 'username']).sum().reset_index()
+    tweets = tweets.sort_values('followers', ascending=False)
+    tweets = tweets.groupby('group', sort=False)
+    tweets = tweets.head(top_users_cnt) if top_users_cnt else tweets
+    tweets = tweets.groupby(['group', 'username'])
+    tweets = tweets.sum()
+    tweets = tweets.reset_index()
     return tweets
 
 
 def get_mentioned_users_from_tweet(tweet: str):
-    return list(map(lambda mention: mention.replace('@', ''), re.findall(r'@[\w\d]+', tweet)))
+    mentions = re.findall(r'@[\w\d]+', tweet)
+    return list(map(lambda mention: mention.replace('@', ''), mentions))
 
 
 def get_mentions_from_tweet_with_idx(idx_tweet):
@@ -55,7 +60,6 @@ def extract_mentions(group):
                          dtype=str)
 
     unique_users = tweets.username.unique()
-    max_name_length = max(map(len, unique_users))
 
     for user in tqdm(unique_users, 'Mentions: extract', leave=False):
         mentions = list(chain(*map(get_mentioned_users_from_tweet,
@@ -79,13 +83,10 @@ def extract_mentions_faster(group):
         return pd.read_csv(outfile_path, header=0)
 
     tweets_path = os.path.join(TWEETS_DIR, group, TWEETS_FILENAME)
-    for data in tqdm(pd.read_csv(tweets_path,
-                                 header=0,
-                                 chunksize=chunksize,
-                                 dtype=str),
-                     'Mentions: extract',
-                     total=int((wc(tweets_path) - 1) / chunksize),
-                     leave=False):
+
+    for data in tqdm(pd.read_csv(tweets_path, header=0, dtype=str),
+                     'Mentions: extract', int(wc(tweets_path) - 1), False):
+
         mentions = chain(map(get_mentions_from_tweet_with_idx,
                              enumerate(data.tweet.values)))
 
@@ -104,6 +105,7 @@ def extract_mentions_faster(group):
     mentions = pd.DataFrame(mentions_dict).drop_duplicates()
     mentions = mentions[mentions.username != mentions.mentioned]
     mentions.to_csv(outfile_path, index=False)
+
     return mentions
 
 
@@ -122,6 +124,7 @@ def get_mentions(only_classified_users=False):
         return pd.read_csv(all_mentions_path, header=0)
 
     gbar = tqdm(GROUPS, 'Mentions: process', leave=False)
+
     for group in gbar:
         gbar.set_postfix(group=group)
         mentions = extract_mentions_faster(group)
@@ -136,5 +139,6 @@ def get_mentions(only_classified_users=False):
                                                     axis='columns')]
 
     print(f'Saving all mentions to {all_mentions_path}...')
+
     mentions.to_csv(all_mentions_path, index=False)
     return mentions
