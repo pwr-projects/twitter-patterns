@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import twint
 from langdetect import detect_langs
+from nltk.corpus import stopwords
+from polyglot.text import Text
 from tqdm import tqdm
 
 from config import *
@@ -19,6 +21,10 @@ from config import *
 from .scrappers import *
 
 nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('stopwords')
+STOPWORDS = set(stopwords.words('english'))
+LEMMATIZER = nltk.stem.WordNetLemmatizer()
 
 
 def wc(filename):
@@ -31,8 +37,10 @@ def load_userlist_from_file(filename: str, filepath: str = USERLISTS_HELPERS_DIR
     users = map(lambda user: user.replace('\n', ''), users)
     return set(users)
 
-def get_group_tweets(groupname:str) -> pd.DataFrame:
+
+def get_group_tweets(groupname: str) -> pd.DataFrame:
     return pd.read_csv(os.path.join(TWEETS_DIR, groupname, TWEETS_FILENAME), header=0)
+
 
 def get_batch(groups, group_name, batch_size: int, batch_idx: int):
     data = list(groups[group_name])
@@ -86,7 +94,8 @@ def add_not_duplicates(groups: Dict[str, Set[str]], category: str, users: Sequen
     return groups
 
 
-def create_group_dict_from_userlists(*categories: Sequence[str], userlist_dir: str = USERS_LIST_DIR) -> Dict[str, Set[str]]:
+def create_group_dict_from_userlists(*categories: Sequence[str],
+                                     userlist_dir: str = USERS_LIST_DIR) ->Dict[str, Set[str]]:
     groups = {}
     for category in tqdm(categories, 'Reading group file'):
         with open(os.path.join(USERS_LIST_DIR, f'{category}.txt'), mode='r') as f:
@@ -98,7 +107,8 @@ def create_group_dict_from_userlists(*categories: Sequence[str], userlist_dir: s
 def create_group_dict_from_tweets(*categories: Sequence[str], tweets_dir: str = TWEETS_DIR) -> Dict[str, Set[str]]:
     groups = {}
     for category in tqdm(categories, 'Reading tweet file'):
-        groups[category] = pd.read_csv(os.path.join(tweets_dir, category, TWEETS_FILENAME)).username.unique().tolist()
+        groups[category] = set(pd.read_csv(os.path.join(tweets_dir, category,
+                                                        TWEETS_FILENAME)).username.unique().tolist())
     return groups
 
 
@@ -134,7 +144,7 @@ def tweeter_user_lang_detect(user: str,
 
     lang_probs = defaultdict(list)
 
-    for tweetLang in chain(*[detect_langs(i) for i in preprocess_tweets(list(tweets.tweet), lemma=False)]):
+    for tweetLang in chain(*[detect_langs(i) for i in preprocess_tweet(tweets.tweet)]):
         lang_probs[tweetLang.lang].append(tweetLang.prob)
 
     if delete_csv:
@@ -156,22 +166,24 @@ def only_lang_users(nicks_csv_path: str, output_path: str = None, lang: str = 'e
     return lang_users
 
 
-def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: bool = True, remove_mentions: bool = True) -> Sequence[str]:
-    lemmatizer = nltk.stem.WordNetLemmatizer()
-    preprocessed_tweets = []
-    for tweet in tqdm(tweets, desc='preprocessing tweets'):
-        tweet = tweet.replace('#', '')
-        tweet = re.sub(r'(?:(?:(?:www|http)[:/]*)*\S+(?:\.(?:com|org|pl))(?:/\S+)*)',
-                       '', tweet) if remove_url else tweet
-        tweet = str(tweet).translate(str.maketrans({key: None for key in string.punctuation}))
-        tweet = nltk.word_tokenize(tweet)
-        tweet = map(lambda word: word.lower(), tweet)
-        tweet = filter(lambda word: not word.startswith('@'), tweet) if remove_mentions else tweet
-        tweet = map(lemmatizer.lemmatize, tqdm(tweet, 'Lemmatizing')) if lemma else tweet
-        tweet = ' '.join(tweet)
-        if tweet:
-            preprocessed_tweets.append(tweet)
-    return preprocessed_tweets
+def preprocess_tweet(tweet: str,
+                     lemma: bool = True,
+                     remove_hashes: bool = True,
+                     remove_stopwords: bool = True,
+                     remove_url: bool = True,
+                     remove_mentions: bool = True,
+                     remove_punctuation: bool = True,
+                     to_lower: bool = True,
+                     ):
+    tweet = re.sub(r'(?:(?:(?:www|http)[:/]*)*\S+(?:\.(?:com|org|pl))(?:/\S+)*)', '', tweet) if remove_url else tweet
+    tweet = tweet.replace('#', '') if remove_hashes else tweet
+    tweet = Text(tweet).words
+    tweet = filter(lambda word: word not in STOPWORDS, tweet) if remove_stopwords else tweet
+    tweet = ' '.join(tweet).translate(str.maketrans({key: None for key in string.punctuation})).split()
+    tweet = map(lambda word: word.lower(), tweet) if to_lower else tweet
+    tweet = filter(lambda word: not word.startswith('@'), tweet) if remove_mentions else tweet
+    tweet = map(LEMMATIZER.lemmatize, tqdm(tweet, 'Lemmatizing')) if lemma else tweet
+    return list(filter(None, tweet))
 
 
 def get_extra_users_from_hashtags(group_name: str, low_followers_bound: int, *hashtags: Sequence[str]):
