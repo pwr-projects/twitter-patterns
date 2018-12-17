@@ -16,30 +16,21 @@ from nltk.corpus import stopwords
 from polyglot.text import Text
 from tqdm import tqdm
 
-from config import *
-
-from .scrappers import *
+from config import (FOLLOWERS_DIR, GROUPS, HASHTAG_DIR,
+                    RAW_USERLISTS_FROM_PAGE, TEMP_DIR, TWEETS_DIR,
+                    TWEETS_FILENAME, USERLISTS_HELPERS_DIR, USERS_FILENAME,
+                    USERS_LIST_DIR)
 
 nltk.download('punkt')
 nltk.download('wordnet')
 nltk.download('stopwords')
+
 STOPWORDS = set(stopwords.words('english'))
 LEMMATIZER = nltk.stem.WordNetLemmatizer()
 
 
 def wc(filename):
     return int(check_output(['wc', '-l', filename]).split()[0])
-
-
-def load_userlist_from_file(filename: str, filepath: str = USERLISTS_HELPERS_DIR):
-    with open(os.path.join(filepath, filename), 'r') as f:
-        users = f.readlines()
-    users = map(lambda user: user.replace('\n', ''), users)
-    return set(users)
-
-
-def get_group_tweets(groupname: str) -> pd.DataFrame:
-    return pd.read_csv(os.path.join(TWEETS_DIR, groupname, TWEETS_FILENAME), header=0)
 
 
 def get_batch(groups, group_name, batch_size: int, batch_idx: int):
@@ -59,33 +50,22 @@ def summary_html(summary: Dict[str, str], title: str) -> str:
     return html
 
 
-def summary_dict(summary: Dict[str, Sequence[str]], title: str):
+def summary_dict(groups_users: Dict[str, Sequence[str]], title: str):
     print(title)
     format = '{:15s}\t{:5d}'
-    print('{:15s}\t{:5s}'.format('Category', 'Count'))
-    for k, v in summary.items():
+    print('{:15s}\t{:5s}'.format('Group name', 'Count'))
+
+    for k, v in groups_users.items():
         if len(v):
             print(format.format(k, len(v)))
 
 
-def to_lower(strs: Sequence['str']):
+def lower_list_of_strs(strs: Sequence['str']):
     return list(map(lambda elem: elem.lower(), strs))
 
 
-def extract_tweet_authors(tweets_dir: str) -> Sequence[str]:
-    content = pd.read_csv(os.path.join(tweets_dir, TWEETS_FILENAME), header=0)
-    return content.username.unique()
-
-
-def get_users_with_min_followers_no(users_dir: str, min_followers: int) -> Sequence[str]:
-    assert min_followers > 0, 'min_followers should be greater than 0'
-    content = pd.read_csv(os.path.join(users_dir, USERS_FILENAME), header=0)
-    content = content[['username', 'followers']].drop_duplicates('username')
-    return to_lower(content[content.followers > min_followers].username)
-
-
-def get_duplicates_in_dict(groups: Dict[str, Sequence[str]], other_users: Sequence[str] = list()) -> Set[str]:
-    return set(k for k, v in Counter(chain(*groups.values(), other_users)).items() if v > 1)
+def get_duplicates_in_dict(groups_users: Dict[str, Sequence[str]], other_users: Sequence[str] = []) -> Set[str]:
+    return set(k for k, v in Counter(chain(*groups_users.values(), other_users)).items() if v > 1)
 
 
 def add_not_duplicates(groups: Dict[str, Set[str]], category: str, users: Sequence[str]):
@@ -94,37 +74,42 @@ def add_not_duplicates(groups: Dict[str, Set[str]], category: str, users: Sequen
     return groups
 
 
-def create_group_dict_from_userlists(*categories: Sequence[str],
-                                     userlist_dir: str = USERS_LIST_DIR) ->Dict[str, Set[str]]:
+def create_group_dict_from_userlists(userlist_dir: str = USERS_LIST_DIR) -> Dict[str, Set[str]]:
     groups = {}
-    for category in tqdm(categories, 'Reading group file'):
-        with open(os.path.join(USERS_LIST_DIR, f'{category}.txt'), mode='r') as f:
+
+    for group_name in tqdm(GROUPS, 'Reading group file'):
+        with open(os.path.join(USERS_LIST_DIR, f'{group_name}.txt'), mode='r') as f:
             users = set(map(lambda elem: elem.strip(), f.readlines()))
-        groups[category] = users
+
+        groups[group_name] = users
+
     return groups
 
 
-def create_group_dict_from_tweets(*categories: Sequence[str], tweets_dir: str = TWEETS_DIR) -> Dict[str, Set[str]]:
-    groups = {}
-    for category in tqdm(categories, 'Reading tweet file'):
-        groups[category] = set(pd.read_csv(os.path.join(tweets_dir, category,
-                                                        TWEETS_FILENAME)).username.unique().tolist())
-    return groups
+def create_group_dict_from_tweets(tweets_dir: str = TWEETS_DIR) -> Dict[str, Set[str]]:
+    groups_users = {}
+
+    for group_name in tqdm(GROUPS, 'Reading tweet file'):
+        file_path = os.path.join(tweets_dir, group_name, TWEETS_FILENAME)
+        groups_users[group_name] = set(pd.read_csv(file_path).username)
+
+    return groups_users
 
 
-def export_users_dict_to_files(groups: Dict[str, Set[str]], outdir: str = TEMP_DIR):
-    for group_name, users in groups.items():
+def export_users_dict_to_files(groups_users: Dict[str, Set[str]],
+                               outdir: str = TEMP_DIR):
+    for group_name, users in groups_users.items():
         outpath = f'{group_name}.txt'
-        print(f'Exporting {group_name} to {outpath}')
+
         with open(outpath, mode='w') as f:
             f.write('\n'.join(users))
 
 
 def merge_with_scraped(group_name: str, other_users: Sequence['str']):
-    groups = create_group_dict_from_userlists(group_name, userlist_dir=RAW_USERLISTS_FROM_PAGE)
-    groups = add_not_duplicates(groups, group_name, other_users)
-    export_users_dict_to_files(groups)
-    return groups
+    groups_users = create_group_dict_from_userlists(RAW_USERLISTS_FROM_PAGE)
+    groups_users = add_not_duplicates(groups_users, group_name, other_users)
+    export_users_dict_to_files(groups_users)
+    return groups_users
 
 
 def tweeter_user_lang_detect(user: str,
@@ -184,29 +169,3 @@ def preprocess_tweet(tweet: str,
     tweet = filter(lambda word: not word.startswith('@'), tweet) if remove_mentions else tweet
     tweet = map(LEMMATIZER.lemmatize, tqdm(tweet, 'Lemmatizing')) if lemma else tweet
     return list(filter(None, tweet))
-
-
-def get_extra_users_from_hashtags(group_name: str, low_followers_bound: int, *hashtags: Sequence[str]):
-    download_hashtags(hashtags, tweets_limit=100000)
-
-    for user in tqdm(extract_tweet_authors(HASHTAG_DIR), 'Downloading users followers'):
-        download_followers(user)
-
-    merge_with_scraped(group_name, get_users_with_min_followers_no(FOLLOWERS_DIR, min_followers=low_followers_bound))
-
-
-def get_tweets_with_filtered_users(group: str, tweet_count_threshold: int):
-    print('Reading tweet file...')
-    tweets = pd.read_csv(os.path.join(TWEETS_DIR, group, TWEETS_FILENAME),
-                         low_memory=False,
-                         header=0)
-
-    print('Filtering users...')
-    filtered_users = tweets.groupby('username')['id'].count().reset_index(name='count')
-    filtered_users = filtered_users.sort_values('count')
-    filtered_users = filtered_users[filtered_users['count'] > tweet_count_threshold]
-
-    print('Filtering tweets...')
-    tweets = tweets[tweets.username.isin(filtered_users.username)]
-
-    return tweets, filtered_users

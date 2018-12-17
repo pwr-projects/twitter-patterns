@@ -3,9 +3,12 @@ import shutil
 from typing import Sequence
 
 import twint
+from tqdm import tqdm
 
-from config import *
+from config import FOLLOWERS_DIR, HASHTAG_DIR, TWEETS_DIR
 
+from .loaders import extract_athors_from_tweets, get_users_with_min_followers_no
+from .utils import merge_with_scraped
 
 def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
     if os.path.isdir(HASHTAG_DIR):
@@ -51,3 +54,12 @@ def download_followers(username: str, usergroup: str = '', function=twint.run.Fo
     config.Output = os.path.join(FOLLOWERS_DIR, usergroup, username)
     config.Lowercase = True
     function(config)
+
+
+def get_extra_users_from_hashtags(group_name: str, low_followers_bound: int, *hashtags: Sequence[str]):
+    download_hashtags(hashtags, tweets_limit=100000)
+
+    for user in tqdm(extract_athors_from_tweets(HASHTAG_DIR), 'Downloading users followers'):
+        download_followers(user)
+
+    merge_with_scraped(group_name, get_users_with_min_followers_no(FOLLOWERS_DIR, min_followers=low_followers_bound))
