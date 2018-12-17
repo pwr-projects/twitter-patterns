@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from itertools import chain, product
 from typing import Dict, Sequence, Set
 
+import emoji
 import nltk
 import numpy as np
 import pandas as pd
@@ -203,3 +204,26 @@ def preprocess_tweets(tweets: Sequence[str], lemma: bool = True, remove_url: boo
         if tweet:
             preprocessed_tweets.append(tweet)
     return preprocessed_tweets
+
+
+class TweetCleaner():
+    def __init__(self):
+        self._tokenizer = nltk.tokenize.TweetTokenizer()
+        self._lemmatizer = nltk.stem.WordNetLemmatizer()
+        self._stop_words = set(nltk.corpus.stopwords.words('english'))
+
+    def clean(self, tweet: str) -> str:
+        # str
+        # tweet = re.sub(r'http\S+', '', tweet)
+        # tweet = re.sub(r'#\S+', '', tweet)
+        # tweet = re.sub(r'@\S+', '', tweet)
+        # tweet = re.sub(r'pic\S+', '', tweet)
+        tweet = tweet.lower()
+        
+        # list
+        tweet = self._tokenizer.tokenize(tweet)
+        tweet = [word for word in tweet if word not in self._stop_words]
+        tweet = [self._lemmatizer.lemmatize(word) for word in tweet]
+        tweet = [word for word in tweet if re.match(r'^[a-z]+$', word) or word in emoji.UNICODE_EMOJI]
+
+        return tweet
