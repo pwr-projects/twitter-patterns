@@ -3,6 +3,7 @@ import pickle as pkl
 import re
 import sys
 from itertools import chain
+from os.path import join as pj
 
 import numpy as np
 import pandas as pd
@@ -11,8 +12,8 @@ from tqdm import tqdm
 from config import (GROUPS, TEMP_DIR, TWEETS_DIR, TWEETS_FILENAME,
                     only_classified_users_str)
 
-from .utils import wc
 from .loaders import get_group_tweets
+from .utils import wc
 
 
 def get_top_followers(threshold: int = 10000, top_users_cnt=None):
@@ -47,14 +48,14 @@ def get_mentions_from_tweet_with_idx(idx_tweet):
 
 
 def extract_mentions(group):
-    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.csv')
+    outfile_path = pj(TEMP_DIR, f'{group}_mentions.csv')
 
     if os.path.isfile(outfile_path):
         print(f'Loading {group} mention from {outfile_path}...')
         return pd.read_csv(outfile_path, header=0)
 
     mentions_dict = {'group': [], 'username': [], 'mentioned': []}
-    tweets = pd.read_csv(os.path.join(TWEETS_DIR, group, TWEETS_FILENAME),
+    tweets = pd.read_csv(pj(TWEETS_DIR, group, TWEETS_FILENAME),
                          header=0,
                          memory_map=True,
                          dtype=str)
@@ -75,17 +76,17 @@ def extract_mentions(group):
 
 def extract_mentions_faster(group):
     mentions_dict = {'group': [], 'username': [], 'mentioned': []}
-
-    outfile_path = os.path.join(TEMP_DIR, f'{group}_mentions.csv')
+    outfile_path = pj(TEMP_DIR, f'{group}_mentions.csv')
 
     if os.path.isfile(outfile_path):
         print(f'Loading {group} mention from {outfile_path}...')
         return pd.read_csv(outfile_path, header=0)
 
-    tweets_path = os.path.join(TWEETS_DIR, group, TWEETS_FILENAME)
+    group_path = pj(TWEETS_DIR, group)
+    tweets_path = pj(group_path, TWEETS_FILENAME)
 
-    for data in tqdm(pd.read_csv(tweets_path, header=0, dtype=str),
-                     'Mentions: extract', int(wc(tweets_path) - 1), False):
+    for data in tqdm(pd.read_csv(tweets_path, header=0, chunksize=500, dtype=str),
+                     'Mentions: extracting', int(wc(tweets_path) - 1), False):
 
         mentions = chain(map(get_mentions_from_tweet_with_idx,
                              enumerate(data.tweet.values)))
@@ -111,19 +112,19 @@ def extract_mentions_faster(group):
 
 def get_mentions_path(only_classified_users):
     only_for_classified = only_classified_users_str(only_classified_users)
-    all_mention_path = os.path.join(TEMP_DIR, f'all_mentions_{only_for_classified}.csv')
-    return all_mention_path, os.path.isfile(all_mention_path)
+    all_mention_path = pj(TEMP_DIR, f'all_mentions_{only_for_classified}.csv')
+    return all_mention_path
 
 
 def get_mentions(only_classified_users=False):
-    all_mentions_path, _ = get_mentions_path(only_classified_users)
+    all_mentions_path = get_mentions_path(only_classified_users)
     all_mentions = []
 
     if os.path.isfile(all_mentions_path):
         print(f'Found all mentions in {all_mentions_path}. Loading...')
         return pd.read_csv(all_mentions_path, header=0)
 
-    gbar = tqdm(GROUPS, 'Mentions: process', leave=False)
+    gbar = tqdm(GROUPS, 'Mentions: group', leave=False)
 
     for group in gbar:
         gbar.set_postfix(group=group)

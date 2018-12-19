@@ -1,5 +1,6 @@
 import os
 import shutil
+from os.path import join as pj
 from typing import Sequence
 
 import twint
@@ -7,8 +8,10 @@ from tqdm import tqdm
 
 from config import FOLLOWERS_DIR, HASHTAG_DIR, TWEETS_DIR
 
-from .loaders import extract_athors_from_tweets, get_users_with_min_followers_no
+from .loaders import (extract_athors_from_tweets,
+                      get_users_with_min_followers_no)
 from .utils import merge_with_scraped
+
 
 def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
     if os.path.isdir(HASHTAG_DIR):
@@ -27,7 +30,7 @@ def download_hashtags(*hashtags: Sequence[str], tweets_limit: int = 10000):
 
 
 def scrap_tweets(user: str, group: str, limit: int = 100000):
-    path = os.path.join(TWEETS_DIR, group, user)
+    path = pj(TWEETS_DIR, group, user)
 
     if user is None or os.path.isdir(path):
         print(f'{user}\'s tweets already downloaded')
@@ -51,7 +54,7 @@ def download_followers(username: str, usergroup: str = '', function=twint.run.Fo
     config.Username = username
     config.Lang = 'en'
     config.Store_csv = True
-    config.Output = os.path.join(FOLLOWERS_DIR, usergroup, username)
+    config.Output = pj(FOLLOWERS_DIR, usergroup, username)
     config.Lowercase = True
     function(config)
 
