@@ -17,8 +17,10 @@ from config import (GROUPS, RAW_USERLISTS_FROM_PAGE, USERLISTS_HELPERS_DIR,
 from .loaders import load_userlist_from_file
 from .utils import get_duplicates_in_dict, summary_dict
 
+__all__ = ['download_dataset']
 
-def get_twitter_urls(category: str, min_no_of_users: int) -> List[str]:
+
+def _get_twitter_urls(category: str, min_no_of_users: int) -> List[str]:
     urls, page_no = list(), 0
     # I think it's the count of users per page, but not sure... Whatever, it's just for progress bar xD
     users_per_page = 20
@@ -40,7 +42,7 @@ def get_twitter_urls(category: str, min_no_of_users: int) -> List[str]:
     return urls
 
 
-def add_nicknames_from_urls(urls: List[str], usernames: Dict[str, str], category: str):
+def _add_nicknames_from_urls(urls: List[str], usernames: Dict[str, str], category: str):
     username_re = re.compile(r'.*screen_name=([\w\d-]+)')
     with tqdm(urls, desc='Extracting usernames', leave=False) as ubar:
         for url in ubar:
@@ -52,16 +54,16 @@ def add_nicknames_from_urls(urls: List[str], usernames: Dict[str, str], category
             ubar.set_postfix(username=matched)
 
 
-def download_category(min_no_of_users: int = 100) -> List[str]:
+def _download_category(min_no_of_users: int = 100) -> List[str]:
     usernames = {group_name: list() for group_name in GROUPS}
 
     with tqdm(GROUPS, 'Getting category users', leave=False) as cbar:
         for group_name in cbar:
             cbar.set_postfix(group=group_name)
-            urls = get_twitter_urls(group_name, min_no_of_users)
+            urls = _get_twitter_urls(group_name, min_no_of_users)
             if not urls:
                 raise Exception(f'Cannot download html for category {group_name}')
-            add_nicknames_from_urls(urls, usernames, group_name)
+            _add_nicknames_from_urls(urls, usernames, group_name)
 
             with open(os.path.join(RAW_USERLISTS_FROM_PAGE, f'{group_name}.txt'), 'w') as f:
                 f.write('\n'.join(usernames[group_name]))
@@ -70,7 +72,7 @@ def download_category(min_no_of_users: int = 100) -> List[str]:
             for group_name, usernames in usernames.items() if group_name in GROUPS}
 
 
-def find_group_names_on_main_page(url: str) -> List[str]:
+def _find_group_names_on_main_page(url: str) -> List[str]:
     tweeter_urls = html.fromstring(requests.get(url).content).xpath('//@href')
     cats = []
     for group_html in tqdm(tweeter_urls, 'Extract group names', leave=False):
@@ -86,7 +88,7 @@ def find_group_names_on_main_page(url: str) -> List[str]:
             cats))
 
 
-def filter_and_export(groups_users: Dict[str, Set[str]]):
+def _filter_and_export(groups_users: Dict[str, Set[str]]):
     try:
         politicians = load_userlist_from_file('politicians.txt', USERLISTS_HELPERS_DIR)
         politicians = set(map(lambda elem: elem.lower(), politicians))
@@ -119,5 +121,5 @@ def filter_and_export(groups_users: Dict[str, Set[str]]):
 
 
 def download_dataset():
-    groups_users = download_category()
-    filter_and_export(groups_users)
+    groups_users = _download_category()
+    _filter_and_export(groups_users)

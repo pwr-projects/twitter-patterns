@@ -158,3 +158,4 @@ dataset/tweets
 dataset/adds
 dataset/followers
 dataset/hashtag
+*.zip
