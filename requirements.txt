@@ -12,3 +12,4 @@ polyglot
 pyicu
 pycld2
 morfessor
+emoji

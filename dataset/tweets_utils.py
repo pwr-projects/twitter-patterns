@@ -4,6 +4,7 @@ import string
 from os.path import join as pj
 from typing import Dict, Set
 
+import emoji
 import nltk
 import pandas as pd
 from nltk.corpus import stopwords
@@ -70,6 +71,26 @@ def merge_group_tweets(group_name):
 
     merged_tweets.to_csv(pj(TWEETS_DIR, f'{group_name}.csv'))
 
+
 def merge_tweets_of_all_groups():
     for group_name in tqdm(GROUPS, 'Tweets merging: group'):
         merge_group_tweets(group_name)
+
+
+class TweetCleaner():
+    def __init__(self):
+        self._tokenizer = nltk.tokenize.TweetTokenizer()
+        self._lemmatizer = nltk.stem.WordNetLemmatizer()
+        self._stop_words = set(nltk.corpus.stopwords.words('english'))
+
+    def emotional_clean(self, tweet: str) -> str:
+        if tweet:
+            tweet = tweet.lower()
+            tweet = self._tokenizer.tokenize(tweet)
+            tweet = [word for word in tweet if word not in self._stop_words]
+            tweet = [self._lemmatizer.lemmatize(word) for word in tweet]
+            tweet = [word for word in tweet if re.match(r'^[a-z]+$', word) or word in emoji.UNICODE_EMOJI]
+
+            return tweet
+
+        return []

@@ -10,7 +10,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from config import (GROUPS, RESOURCE_DIR, TEMP_DIR, TWEETS_DIR,
-                    TWEETS_FILENAME, only_classified_users_str)
+                    TWEETS_FILENAME, FEATURES_DIR, FEATURES_FILENAME,
+                    FEATURES_INC_GRAPH_FILENAME, only_classified_users_str)
 from dataset import get_mentions, get_mentions_path, wc
 
 try:
@@ -110,6 +111,7 @@ def draw_graph(only_classified_users):
 
 def graph_measures(graph: gt.Graph) -> pd.DataFrame:
     def get_attrs(attrs): return (attrs[1][0], attrs[1][1][1], attrs[0])
+
     def append_val(key, prop, v): measures[key][0].append(prop[v])
 
     _, vp_authority, vp_hub = gt.hits(graph)
@@ -132,3 +134,11 @@ def graph_measures(graph: gt.Graph) -> pd.DataFrame:
         append_val(*get_attrs(attrs))
 
     return pd.DataFrame(dict(map(lambda item: (item[0], item[1][0]), measures.items()))).fillna(0)
+
+
+def merge_graph_feats_with_tweet_feats(graph_features):
+    features = pd.read_csv(pj(FEATURES_DIR, FEATURES_FILENAME), header=0)
+    features = features.join(graph_features.set_index(['tp_group', 'tp_author']),
+                             on=['tp_group', 'tp_author']).fillna(0)
+    features.to_csv(pj(FEATURES_DIR, FEATURES_INC_GRAPH_FILENAME), index=False)
+    return features
