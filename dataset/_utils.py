@@ -212,18 +212,14 @@ class TweetCleaner():
         self._lemmatizer = nltk.stem.WordNetLemmatizer()
         self._stop_words = set(nltk.corpus.stopwords.words('english'))
 
-    def clean(self, tweet: str) -> str:
-        # str
-        # tweet = re.sub(r'http\S+', '', tweet)
-        # tweet = re.sub(r'#\S+', '', tweet)
-        # tweet = re.sub(r'@\S+', '', tweet)
-        # tweet = re.sub(r'pic\S+', '', tweet)
-        tweet = tweet.lower()
-        
-        # list
-        tweet = self._tokenizer.tokenize(tweet)
-        tweet = [word for word in tweet if word not in self._stop_words]
-        tweet = [self._lemmatizer.lemmatize(word) for word in tweet]
-        tweet = [word for word in tweet if re.match(r'^[a-z]+$', word) or word in emoji.UNICODE_EMOJI]
+    def emotional_clean(self, tweet: str) -> str:
+        if tweet:
+            tweet = tweet.lower()
+            tweet = self._tokenizer.tokenize(tweet)
+            tweet = [word for word in tweet if word not in self._stop_words]
+            tweet = [self._lemmatizer.lemmatize(word) for word in tweet]
+            tweet = [word for word in tweet if re.match(r'^[a-z]+$', word) or word in emoji.UNICODE_EMOJI]
 
-        return tweet
+            return tweet
+        
+        return []
