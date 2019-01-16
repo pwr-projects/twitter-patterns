@@ -159,3 +159,4 @@ dataset/adds
 dataset/followers
 dataset/hashtag
 *.zip
+glob_avg_feat/krzyz_*
