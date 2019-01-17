@@ -135,7 +135,7 @@ def get_n_longest_tweets(n):
         else:
             tweets.append(group_tweets)
 
-    with open(f'longest_{count}_tweets.pkl', 'wb') as f:
+    with open(f'longest_{n}_tweets.pkl', 'wb') as f:
         pickle.dump(tweets, f)
 
     return tweets
