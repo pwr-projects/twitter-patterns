@@ -116,6 +116,7 @@ def get_n_longest_tweets_in_group(group_name, n):
         tweets.index = tweets.tweet.str.len()
         tweets = tweets.sort_index(ascending=False).reset_index(drop=True)
         tweets = tweets.groupby('username').head(n).reset_index(drop=True)
+
         tweets.tweet = tweets.tweet.apply(lambda x: ' '.join(cleaner.emotional_clean(x)))
         tweets.tweet = tweets.tweet.apply(preprocess_tweet)
 
@@ -123,6 +124,7 @@ def get_n_longest_tweets_in_group(group_name, n):
             group_tweets = tweets
         else:
             group_tweets = group_tweets.append(tweets)
+
     return group_tweets
 
 
@@ -133,7 +135,7 @@ def get_n_longest_tweets(n):
         if tweets is None:
             tweets = group_tweets
         else:
-            tweets.append(group_tweets)
+            tweets = tweets.append(group_tweets)
 
     with open(f'longest_{n}_tweets.pkl', 'wb') as f:
         pickle.dump(tweets, f)
