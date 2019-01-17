@@ -129,7 +129,7 @@ def get_n_longest_tweets_in_group(group_name, n):
 def get_n_longest_tweets(n):
     tweets = None
     for group_name in GROUPS:
-        group_tweets = merge_group_tweets(group_name, n)
+        group_tweets = get_n_longest_tweets_in_group(group_name, n)
         if tweets is None:
             tweets = group_tweets
         else:
